@@ -115,36 +115,35 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: LcSpace.headerHeight,
-      padding: EdgeInsets.symmetric(horizontal: gutter),
+      // No left padding: the wordmark is flush to the edge of the screen, the
+      // way the brand sets it. Only the right-hand controls get a gutter.
+      padding: EdgeInsets.only(right: gutter),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: LcColors.border)),
       ),
       child: Row(
         children: [
-          // Kept in the layout even when hidden so the wordmark does not jump.
-          Visibility(
-            visible: onBack != null,
-            maintainSize: true,
-            maintainAnimation: true,
-            maintainState: true,
-            child: _IconButton(
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const LcWordmark(height: 20),
+              const SizedBox(height: 2),
+              Text('ticketing', style: LcType.eyebrow.copyWith(fontSize: 10)),
+            ],
+          ),
+          const Spacer(),
+          // Back sits with the other controls on the right rather than leading
+          // the row, so nothing can push the logo off the left edge. Android's
+          // system back gesture remains the primary way out either way.
+          if (onBack != null) ...[
+            _IconButton(
               icon: LucideIcons.arrowLeft,
               onTap: onBack,
               semanticLabel: 'Volver',
             ),
-          ),
-          const SizedBox(width: LcSpace.sm),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const LcWordmark(height: 20),
-                const SizedBox(height: 2),
-                Text('ticketing', style: LcType.eyebrow.copyWith(fontSize: 10)),
-              ],
-            ),
-          ),
+            const SizedBox(width: LcSpace.sm),
+          ],
           if (onHistory != null)
             Stack(
               clipBehavior: Clip.none,
