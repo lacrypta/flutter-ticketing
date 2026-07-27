@@ -56,3 +56,6 @@ android/app/libs/*.jar
 # Local env overrides
 .env
 .env.local
+
+# Built artifacts staged for distribution
+dist/
