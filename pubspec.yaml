@@ -69,6 +69,24 @@ dev_dependencies:
   # version that resolves. Re-check on the next riverpod or drift bump.
   drift_dev: 2.34.0
   mocktail: ^1.0.4
+  flutter_launcher_icons: ^0.14.4
+
+# App icon. Sources are generated from the isotype vector by
+# `python3 tool/generate_icon.py` — see that script for why we rasterise rather
+# than upscale the 112px favicon. Regenerate the platform assets with:
+#
+#     dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true # the App Store rejects icons with an alpha channel
+  image_path: assets/icon/icon.png
+  # Android 8+ adaptive icon: the system crops to a shape, so the mark is drawn
+  # smaller on its own layer and the background is a flat brand colour.
+  adaptive_icon_background: "#101010"
+  adaptive_icon_foreground: assets/icon/icon_foreground.png
+  # Monochrome (themed icons, Android 13+) reuses the same silhouette.
+  adaptive_icon_monochrome: assets/icon/icon_foreground.png
 
 flutter:
   uses-material-design: true

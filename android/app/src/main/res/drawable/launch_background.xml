@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
+<!--
+  The cold-start window background, shown before the Flutter engine paints its
+  first frame. The template ships white; this app is dark-only and gets used in
+  dark venues, so white here is a strobe in the operator's face on every launch.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
-
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+    <item android:drawable="@color/lc_background" />
 </layer-list>

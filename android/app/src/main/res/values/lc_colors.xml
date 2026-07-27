@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Kept separate from colors.xml, which flutter_launcher_icons rewrites when the
+  app icon is regenerated.
+-->
+<resources>
+    <!-- LcColors.background. The window sits behind the Flutter UI, so any
+         other value shows as a flash on cold start and a mismatched band
+         during over-scroll. -->
+    <color name="lc_background">#090909</color>
+</resources>
