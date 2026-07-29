@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/theme/lc_colors.dart';
@@ -15,12 +16,14 @@ import '../history/history_controller.dart';
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({
     required this.onScan,
+    required this.onManualEntry,
     required this.onHistory,
     required this.onSettings,
     super.key,
   });
 
   final VoidCallback onScan;
+  final VoidCallback onManualEntry;
   final VoidCallback onHistory;
   final VoidCallback onSettings;
 
@@ -46,6 +49,14 @@ class HomeScreen extends ConsumerWidget {
             label: 'Escanear QR',
             iconBuilder: (_) => const LcScanMark(size: 34),
             onPressed: onScan,
+          ),
+          const SizedBox(height: LcSpace.md),
+          // Deliberately low-emphasis: the camera is the fast path and should
+          // stay the obvious one. This is here for the QR that won't scan.
+          LcSecondaryButton(
+            label: 'Ingresar código',
+            icon: LucideIcons.keyboard,
+            onPressed: onManualEntry,
           ),
           const SizedBox(height: LcSpace.lg),
           if (successes > 0) _SessionSummary(successes: successes),

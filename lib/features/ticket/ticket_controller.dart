@@ -141,7 +141,20 @@ class TicketFlowController extends Notifier<TicketFlowState> {
       final gifts = await request;
       await floor;
       state = state.copyWith(gifts: gifts, phase: TicketPhase.gifts);
+    } on InvalidTicketException {
+      // A 404 here does NOT mean the ticket is bad — we only got this far
+      // because it validated and checked in seconds ago. The gifts endpoint
+      // resolves codes differently from the check-in endpoint and 404s for
+      // codes that are perfectly valid (see README → Backend asks), so
+      // surfacing "Ticket inválido" under a successful check-in would be both
+      // wrong and alarming. Treat it as "this attendee has no benefits".
+      state = state.copyWith(
+        gifts: const {},
+        phase: TicketPhase.gifts,
+        clearError: true,
+      );
     } on AppException catch (error) {
+      // Everything else stays loud: a network drop or a 500 is real.
       state = state.copyWith(phase: TicketPhase.gifts, error: error.message);
     }
   }

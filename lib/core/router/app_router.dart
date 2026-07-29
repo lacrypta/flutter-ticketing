@@ -1,8 +1,10 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/history/history_screen.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/scanner/manual_token_sheet.dart';
 import '../../features/scanner/scanner_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/ticket/ticket_controller.dart';
@@ -30,6 +32,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.home,
         builder: (context, state) => HomeScreen(
           onScan: () => context.push(Routes.scan),
+          onManualEntry: () => unawaited(_openManualEntry(context, ref)),
           onHistory: () => context.push(Routes.history),
           onSettings: () => context.push(Routes.settings),
         ),
@@ -75,6 +78,14 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// Prompt for a code, then drive the same flow a scan would.
+Future<void> _openManualEntry(BuildContext context, Ref ref) async {
+  final token = await ManualTokenSheet.show(context);
+  if (token == null || !context.mounted) return;
+  unawaited(ref.read(ticketFlowProvider.notifier).open(token));
+  unawaited(context.push(Routes.ticket));
+}
 
 void unawaited(Future<void> future) {
   future.ignore();

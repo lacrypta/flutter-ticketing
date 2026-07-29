@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/theme/lc_colors.dart';
 import '../../core/theme/lc_metrics.dart';
 import '../../core/theme/lc_typography.dart';
@@ -41,16 +42,7 @@ class SettingsScreen extends ConsumerWidget {
           Text('Ajustes', style: LcType.h1),
 
           const _SectionLabel('Servidor'),
-          LcCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const LcEyebrow('base url'),
-                const SizedBox(height: 6),
-                SelectableText(settings.eventsBaseUrl, style: LcType.body),
-              ],
-            ),
-          ),
+          _BaseUrlCard(current: settings.eventsBaseUrl),
 
           const _SectionLabel('Identidad del dispositivo'),
           npub.when(
@@ -153,6 +145,117 @@ class SettingsScreen extends ConsumerWidget {
     PrinterBackendChoice.bluetooth => 'Bluetooth ESC/POS',
     PrinterBackendChoice.none => 'Sin impresora',
   };
+}
+
+/// Retarget the app at a different backend without rebuilding.
+///
+/// Needed to point a device at a local `next dev` server, and at a staging
+/// deployment later. The value is persisted by [SettingsRepository]; `dioProvider`
+/// watches settings, so saving rebuilds the HTTP client immediately.
+///
+/// Note a plain-HTTP URL only works in a **debug** build — release keeps
+/// Android's default cleartext ban (see `src/debug/res/xml/network_security_config.xml`).
+class _BaseUrlCard extends ConsumerStatefulWidget {
+  const _BaseUrlCard({required this.current});
+
+  final String current;
+
+  @override
+  ConsumerState<_BaseUrlCard> createState() => _BaseUrlCardState();
+}
+
+class _BaseUrlCardState extends ConsumerState<_BaseUrlCard> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.current,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool get _dirty => _controller.text.trim() != widget.current;
+
+  Future<void> _save() async {
+    final value = _controller.text.trim().replaceAll(RegExp(r'/+$'), '');
+    if (value.isEmpty) return;
+    await ref
+        .read(settingsProvider.notifier)
+        .update(ref.read(settingsProvider).copyWith(eventsBaseUrl: value));
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Servidor: $value')));
+  }
+
+  Future<void> _reset() async {
+    _controller.text = AppConfig.eventsBaseUrl;
+    await _save();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LcCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const LcEyebrow('base url'),
+          const SizedBox(height: LcSpace.sm),
+          TextField(
+            controller: _controller,
+            autocorrect: false,
+            enableSuggestions: false,
+            keyboardType: TextInputType.url,
+            style: LcType.body,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _save(),
+            decoration: const InputDecoration(
+              filled: true,
+              fillColor: LcColors.surface1,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: LcSpace.md,
+                vertical: LcSpace.md,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: LcRadius.cardAll,
+                borderSide: BorderSide(color: LcColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: LcRadius.cardAll,
+                borderSide: BorderSide(color: LcColors.accent),
+              ),
+            ),
+          ),
+          const SizedBox(height: LcSpace.sm),
+          Row(
+            children: [
+              Expanded(
+                child: LcSecondaryButton(
+                  label: 'Guardar',
+                  icon: LucideIcons.check,
+                  height: LcTouch.small,
+                  onPressed: _dirty ? _save : null,
+                ),
+              ),
+              const SizedBox(width: LcSpace.sm),
+              Expanded(
+                child: LcSecondaryButton(
+                  label: 'Restaurar',
+                  icon: LucideIcons.rotateCcw,
+                  height: LcTouch.small,
+                  onPressed: widget.current == AppConfig.eventsBaseUrl
+                      ? null
+                      : _reset,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// The device npub, as text *and* a QR — whoever registers the device is

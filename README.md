@@ -56,6 +56,23 @@ Point it at another backend without touching source:
 flutter run --dart-define=EVENTS_BASE_URL=https://staging.lacrypta.ar
 ```
 
+You can also change it at runtime in **Ajustes → Servidor**, which is the
+quicker loop when testing.
+
+### Against a local lacrypta-crm
+
+```bash
+flutter run --dart-define=EVENTS_BASE_URL=http://10.0.2.2:3100
+```
+
+`10.0.2.2` is the Android emulator's alias for the host loopback. Plain HTTP
+only works in a **debug** build — `src/debug/res/xml/network_security_config.xml`
+exempts `10.0.2.2` / `localhost` / `127.0.0.1` and nothing else. Release builds
+keep Android's default cleartext ban.
+
+The QR parser rejects hosts outside `*.lacrypta.ar`, so a local `/ticket/<uuid>`
+URL will not scan — paste the bare ticket code into **Ingresar código** instead.
+
 Tests (no device needed):
 
 ```bash
@@ -140,7 +157,25 @@ native client does.
 Get the device npub from **Ajustes → Identidad del dispositivo** (shown as text
 and as a QR).
 
-**2. Make gift consume idempotent.** It currently isn't, and stock is not
+**2. Fix `loadCheckinTicket` — `/gifts` currently 404s for every ticket.**
+Verified against a live local CRM: `GET /api/checkin/{code}` returns `200` for a
+code that `GET /api/checkin/{code}/gifts` rejects with `404 Ticket inválido`.
+Two independent defects in `lib/checkin-tickets.ts`:
+
+- It resolves `code` against **`orders.ticket_code` only**, while real per-ticket
+  codes live on `items.ticket_code`. `resolveCheckinContext` in the same file
+  already handles both — `loadCheckinTicket` needs the same second branch.
+- Its embed is a bare `events (...)`, where `resolveCheckinContext` uses the
+  explicit `events!orders_org_event_fkey (...)`. With two FK paths from `orders`
+  to `events`, PostgREST cannot disambiguate and the embed fails — so even an
+  order-level code 404s on the route's `!row.events` guard. The failure is
+  silent because the query destructures `{ data }` and drops `error`.
+
+Until that lands, this app treats a 404 from `/gifts` as "no benefits" rather
+than an error, so a successful check-in never renders "Ticket inválido"
+underneath itself. The React PWA has no such guard and shows the error.
+
+**3. Make gift consume idempotent.** It currently isn't, and stock is not
 reserved. Two devices offline can both promise the last pizza. Unfixable
 client-side — it needs a server-side idempotency key.
 
