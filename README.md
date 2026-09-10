@@ -33,7 +33,7 @@ Three things the PWA structurally cannot do:
 |---|---|---|
 | **M0** | Token parser, NIP-98, nostr signing, theme, components | ✅ done |
 | **M1** | API client + all check-in screens | ✅ done |
-| **M2** | Printing (ZCS terminal + Bluetooth ESC/POS) | ⬜ next |
+| **M2** | Printing — ZCS terminal (voucher on gift claim) | ✅ done |
 | **M3** | Offline outbox + sync | ⬜ |
 | **M4** | Staff PIN lock, NIP-98 wired on | ⬜ (ships dark) |
 | **M5** | NFC card read → npub → ticket lookup | ⬜ (blocked, see below) |
@@ -207,22 +207,40 @@ accordingly: iPhones are backup scanners, not the primary door.
 
 ---
 
-## Printing (M2)
+## Printing
 
-Two backends behind one `PrinterBackend` interface, chosen at runtime and
-overridable in Ajustes:
+Claiming a benefit prints a voucher on the terminal's built-in ZCS thermal
+printer, via a platform channel ported from
+[lawalletio/flutter-pos](https://github.com/lawalletio/flutter-pos). Verified on
+a Z92.
 
-- **ZCS SmartPos** — the built-in printer on Ciontek terminals (Z92, CS30Pro),
-  via a platform channel. **Android only.**
-- **Bluetooth ESC/POS** — `print_bluetooth_thermal` + `esc_pos_utils_plus`.
-  Android and iOS.
+The server consume completes **before** anything prints — printing first would
+put a voucher in someone's hand for a benefit a `409` then refuses. If the
+printer fails after the consume succeeded, the app says so loudly and tells
+staff to hand the item over anyway.
 
-The ZCS SDK jars are **proprietary and not redistributable**, so they are
-gitignored. Drop `SmartPos_*.jar` and `zxing-core-*.jar` into
-`android/app/libs/` to build that path; without them the resolver falls back to
-Bluetooth.
+Check paper before doors: **Ajustes → Impresora → Imprimir prueba**.
 
-Both backends render from one `Receipt` model, so the output is identical.
+### The proprietary bits
+
+The ZCS SDK is not redistributable, so **both** halves are gitignored and must
+be copied in by hand before an Android build that needs printing:
+
+```
+android/app/libs/                 SmartPos_*.jar, zxing-core-*.jar
+android/app/src/main/jniLibs/     armeabi-v7a|arm64-v8a/libSmartPosJni.so, libEmvCoreJni.so
+```
+
+The jar alone is not enough — without the `.so` the SDK throws
+`dlopen failed: library "libSmartPosJni.so" not found` and the app reports "sin
+impresora". Missing files are not fatal: check-in works, vouchers just don't
+print.
+
+`proguard-rules.pro` keeps `com.zcs.**`. Without it the printer works in debug
+and dies in release only.
+
+Bluetooth ESC/POS for non-ZCS hardware is not built — the settings option is
+inert. Add it when there is a device that needs it.
 
 ---
 

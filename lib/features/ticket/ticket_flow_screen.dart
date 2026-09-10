@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/lc_colors.dart';
 import '../../core/theme/lc_metrics.dart';
 import '../../core/theme/lc_typography.dart';
+import '../../data/printer/printer_channel.dart';
 import '../../domain/ticket/gift.dart';
 import '../../domain/ticket/ticket.dart';
 import '../../ui/components/lc_buttons.dart';
@@ -99,28 +100,51 @@ class TicketFlowScreen extends ConsumerWidget {
         ),
         TicketPhase.gifts => _GiftsView(
           state: state,
-          onClaim: (gift) => _claim(ref, gift),
+          onClaim: (gift) => _claim(context, ref, gift),
           onScanAgain: onScanAgain,
         ),
       },
     );
   }
 
-  Future<void> _claim(WidgetRef ref, Gift gift) async {
-    final claimed = await ref.read(ticketFlowProvider.notifier).claimGift(gift);
+  Future<void> _claim(BuildContext context, WidgetRef ref, Gift gift) async {
+    final controller = ref.read(ticketFlowProvider.notifier);
+    final ticket = ref.read(ticketFlowProvider).ticket;
+
+    // The server call completes FIRST. Printing before it would put a voucher
+    // in someone's hand for a benefit a 409 then refuses — a discrepancy nobody
+    // at the door can undo.
+    final claimed = await controller.claimGift(gift);
     if (claimed == null) return;
-    // M2 prints the receipt here, from the same Receipt model both printer
-    // backends render.
-    ref
-        .read(ticketFlowProvider.notifier)
-        .recordClaim(
-          ClaimedGift(
-            gift: claimed,
-            claimedAt: DateTime.now(),
-            totalArs: 0,
-            satPrice: 0,
-          ),
-        );
+
+    final claimedAt = DateTime.now();
+    controller.recordClaim(
+      ClaimedGift(
+        gift: claimed,
+        claimedAt: claimedAt,
+        totalArs: 0,
+        satPrice: 0,
+      ),
+    );
+
+    final error = await PrinterChannel.printVoucher(
+      gift: claimed.label,
+      event: ticket?.eventName ?? '',
+      attendee: ticket?.attendeeName ?? '',
+      date: DateFormat('dd/MM/yy HH:mm', 'es_AR').format(claimedAt),
+      ticket: _short(ticket?.token ?? ''),
+    );
+
+    // The benefit is already consumed at this point, so a printer failure must
+    // be loud: staff have to hand it over without the voucher.
+    if (error != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$error — entregá ${claimed.label} igual'),
+          backgroundColor: LcColors.surface3,
+        ),
+      );
+    }
   }
 
   void _recordHistory(WidgetRef ref, TicketFlowState state) {

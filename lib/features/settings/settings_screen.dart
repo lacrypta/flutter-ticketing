@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -9,6 +10,7 @@ import '../../core/theme/lc_colors.dart';
 import '../../core/theme/lc_metrics.dart';
 import '../../core/theme/lc_typography.dart';
 import '../../data/api/api_providers.dart';
+import '../../data/printer/printer_channel.dart';
 
 import '../../data/settings/settings_repository.dart';
 import '../../ui/components/lc_buttons.dart';
@@ -116,11 +118,7 @@ class SettingsScreen extends ConsumerWidget {
                     title: Text(_printerLabel(choice), style: LcType.body),
                   ),
                 const SizedBox(height: LcSpace.sm),
-                Text(
-                  'La impresión llega en M2. ZCS funciona sólo en terminales '
-                  'Ciontek; Bluetooth ESC/POS funciona en Android y iOS.',
-                  style: LcType.caption,
-                ),
+                const _PrinterTest(),
               ],
             ),
           ),
@@ -145,6 +143,80 @@ class SettingsScreen extends ConsumerWidget {
     PrinterBackendChoice.bluetooth => 'Bluetooth ESC/POS',
     PrinterBackendChoice.none => 'Sin impresora',
   };
+}
+
+/// Printer status plus a test print — staff check paper before doors open, and
+/// it is the only way to tell a missing printer from a jammed one.
+class _PrinterTest extends StatefulWidget {
+  const _PrinterTest();
+
+  @override
+  State<_PrinterTest> createState() => _PrinterTestState();
+}
+
+class _PrinterTestState extends State<_PrinterTest> {
+  bool? _available;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    PrinterChannel.isAvailable().then(
+      (v) => mounted ? setState(() => _available = v) : null,
+    );
+  }
+
+  Future<void> _test() async {
+    setState(() => _busy = true);
+    final error = await PrinterChannel.printVoucher(
+      gift: 'PRUEBA',
+      event: 'La Crypta Ticketing',
+      attendee: 'Test de impresora',
+      date: DateFormat('dd/MM/yy HH:mm', 'es_AR').format(DateTime.now()),
+      ticket: '',
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error ?? 'Impreso correctamente')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final available = _available;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LcStatusPill(
+          available == null
+              ? 'buscando…'
+              : available
+              ? 'impresora lista'
+              : 'sin impresora',
+          color: available == null
+              ? LcColors.textMuted
+              : available
+              ? LcColors.success
+              : LcColors.textMuted,
+          dot: true,
+        ),
+        const SizedBox(height: LcSpace.sm),
+        LcSecondaryButton(
+          label: 'Imprimir prueba',
+          icon: LucideIcons.printer,
+          busy: _busy,
+          onPressed: available == true ? _test : null,
+        ),
+        const SizedBox(height: LcSpace.sm),
+        Text(
+          'Sólo terminales ZCS/Ciontek tienen impresora integrada. En cualquier '
+          'otro equipo el check-in funciona igual, sin comprobante.',
+          style: LcType.caption,
+        ),
+      ],
+    );
+  }
 }
 
 /// Retarget the app at a different backend without rebuilding.

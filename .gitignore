@@ -59,3 +59,6 @@ android/app/libs/*.jar
 
 # Built artifacts staged for distribution
 dist/
+
+# Proprietary ZCS native libs (ship with the SDK, not redistributable)
+android/app/src/main/jniLibs/

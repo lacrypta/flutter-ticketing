@@ -50,6 +50,10 @@ android {
 
     buildTypes {
         release {
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig = if (keystorePropertiesFile.exists())
                 signingConfigs.getByName("release")
             else
@@ -62,6 +66,13 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    // ZCS SmartPos SDK — the built-in thermal printer on Ciontek terminals
+    // (Z92, CS30Pro). Proprietary and not redistributable, so the jars are
+    // gitignored; see README. Absent jars = no printer, app still runs.
+    implementation(fileTree("libs") { include("*.jar") })
 }
 
 flutter {
