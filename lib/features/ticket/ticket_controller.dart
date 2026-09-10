@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/config/gift_catalogue.dart';
 import '../../core/error/app_exception.dart';
 import '../../core/theme/lc_metrics.dart';
 import '../../data/api/api_providers.dart';
@@ -30,6 +29,7 @@ class TicketFlowState {
     this.token,
     this.ticket,
     this.gifts = const {},
+    this.catalogue = const {},
     this.claimed = const [],
     this.error,
     this.busy = false,
@@ -42,6 +42,9 @@ class TicketFlowState {
 
   /// `item_key` → remaining. Replaced wholesale by each server response.
   final Map<String, int> gifts;
+
+  /// `item_key` → title/artwork, straight from the server.
+  final Map<String, Gift> catalogue;
 
   final List<ClaimedGift> claimed;
   final String? error;
@@ -57,7 +60,8 @@ class TicketFlowState {
   /// quantity picker. Ported from the web app.
   List<Gift> get giftUnits => [
     for (final entry in gifts.entries)
-      for (var i = 0; i < entry.value; i++) resolveGift(entry.key),
+      for (var i = 0; i < entry.value; i++)
+        catalogue[entry.key] ?? Gift(id: entry.key, label: entry.key),
   ];
 
   TicketFlowState copyWith({
@@ -65,6 +69,7 @@ class TicketFlowState {
     String? token,
     Ticket? ticket,
     Map<String, int>? gifts,
+    Map<String, Gift>? catalogue,
     List<ClaimedGift>? claimed,
     String? error,
     bool? busy,
@@ -76,6 +81,7 @@ class TicketFlowState {
     token: token ?? this.token,
     ticket: ticket ?? this.ticket,
     gifts: gifts ?? this.gifts,
+    catalogue: catalogue ?? this.catalogue,
     claimed: claimed ?? this.claimed,
     error: clearError ? null : (error ?? this.error),
     busy: busy ?? this.busy,
@@ -138,9 +144,17 @@ class TicketFlowController extends Notifier<TicketFlowState> {
       // rather than as work. Ported from the web app.
       final request = ref.read(ticketingApiProvider).gifts(ticket.token);
       final floor = Future<void>.delayed(LcMotion.minimumLoad);
-      final gifts = await request;
+      final result = await request;
       await floor;
-      state = state.copyWith(gifts: gifts, phase: TicketPhase.gifts);
+      state = state.copyWith(
+        gifts: result.counts,
+        catalogue: {
+          for (final json in result.catalogue)
+            if (json['item_key'] != null)
+              json['item_key'].toString(): Gift.fromJson(json),
+        },
+        phase: TicketPhase.gifts,
+      );
     } on InvalidTicketException {
       // A 404 here does NOT mean the ticket is bad — we only got this far
       // because it validated and checked in seconds ago. The gifts endpoint

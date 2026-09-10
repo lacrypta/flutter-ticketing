@@ -20,17 +20,19 @@ class PrinterChannel {
   static Future<String?> printVoucher({
     required String gift,
     required String event,
-    required String attendee,
     required String date,
     required String ticket,
+    Uint8List? image,
   }) async {
     try {
       final code = await _ch.invokeMethod<int>('printVoucher', {
         'gift': gift,
         'event': event,
-        'attendee': attendee,
         'date': date,
         'ticket': ticket,
+        // Pre-decoded 1-bit PNG bytes; null when there is no artwork or the
+        // fetch failed. Never blocks the voucher.
+        'image': image,
       });
       return _message(code ?? -1);
     } on MissingPluginException {

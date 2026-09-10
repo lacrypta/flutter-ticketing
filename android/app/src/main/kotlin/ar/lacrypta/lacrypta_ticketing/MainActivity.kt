@@ -128,6 +128,16 @@ class MainActivity : FlutterActivity() {
         p.setPrintAppendString("--------------------------------", normal)
         p.setPrintLine(6)
 
+        // Gift artwork, already reduced to 1-bit at head width by Dart.
+        (v["image"] as? ByteArray)?.let { bytes ->
+            runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+                .getOrNull()
+                ?.let {
+                    p.setPrintAppendBitmap(it, Layout.Alignment.ALIGN_CENTER)
+                    p.setPrintLine(10)
+                }
+        }
+
         // The voucher itself is the point of the receipt — biggest thing on it.
         p.setPrintAppendString(
             str(v, "gift") ?: "BENEFICIO",
@@ -135,7 +145,8 @@ class MainActivity : FlutterActivity() {
         )
         p.setPrintLine(6)
 
-        str(v, "attendee")?.let { p.setPrintAppendString(it, fmt(24, Layout.Alignment.ALIGN_CENTER)) }
+        // No attendee name: a voucher gets handed over, dropped on a table and
+        // left in the venue. It only needs to say what it is worth.
         p.setPrintAppendString("--------------------------------", normal)
         str(v, "date")?.let { p.setPrintAppendString(it, fmt(22, Layout.Alignment.ALIGN_NORMAL)) }
         str(v, "ticket")?.let { p.setPrintAppendString(it, fmt(20, Layout.Alignment.ALIGN_NORMAL)) }

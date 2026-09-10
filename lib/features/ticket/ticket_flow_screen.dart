@@ -6,6 +6,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/lc_colors.dart';
 import '../../core/theme/lc_metrics.dart';
 import '../../core/theme/lc_typography.dart';
+import '../../data/api/api_providers.dart';
+import '../../data/printer/gift_artwork.dart';
 import '../../data/printer/printer_channel.dart';
 import '../../domain/ticket/gift.dart';
 import '../../domain/ticket/ticket.dart';
@@ -118,19 +120,16 @@ class TicketFlowScreen extends ConsumerWidget {
     if (claimed == null) return;
 
     final claimedAt = DateTime.now();
-    controller.recordClaim(
-      ClaimedGift(
-        gift: claimed,
-        claimedAt: claimedAt,
-        totalArs: 0,
-        satPrice: 0,
-      ),
-    );
+    controller.recordClaim(ClaimedGift(gift: claimed, claimedAt: claimedAt));
+
+    final artwork = await GiftArtwork(
+      ref.read(dioProvider),
+    ).fetch(claimed.imageUrl);
 
     final error = await PrinterChannel.printVoucher(
+      image: artwork,
       gift: claimed.label,
       event: ticket?.eventName ?? '',
-      attendee: ticket?.attendeeName ?? '',
       date: DateFormat('dd/MM/yy HH:mm', 'es_AR').format(claimedAt),
       ticket: _short(ticket?.token ?? ''),
     );

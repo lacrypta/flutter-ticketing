@@ -88,6 +88,15 @@ class CheckinResultDto {
 /// a map of `item_key` → **remaining** quantity after the operation.
 typedef GiftData = Map<String, int>;
 
+/// The `gifts[]` array adds the title and artwork `gift_data` lacks.
+/// Older servers omit it, so callers must tolerate an empty list.
+List<Map<String, dynamic>> parseGiftCatalogue(Object? raw) => raw is List
+    ? raw
+          .whereType<Map<Object?, Object?>>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList()
+    : const [];
+
 GiftData parseGiftData(Object? raw) {
   if (raw is! Map) return <String, int>{};
   final result = <String, int>{};

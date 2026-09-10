@@ -171,7 +171,6 @@ class _PrinterTestState extends State<_PrinterTest> {
     final error = await PrinterChannel.printVoucher(
       gift: 'PRUEBA',
       event: 'La Crypta Ticketing',
-      attendee: 'Test de impresora',
       date: DateFormat('dd/MM/yy HH:mm', 'es_AR').format(DateTime.now()),
       ticket: '',
     );
