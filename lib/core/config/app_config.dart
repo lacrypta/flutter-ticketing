@@ -10,7 +10,7 @@ abstract final class AppConfig {
   /// The ticketing API. Matches the web app's `VITE_EVENTS_BASE_URL` default.
   static const String eventsBaseUrl = String.fromEnvironment(
     'EVENTS_BASE_URL',
-    defaultValue: 'https://events.lacrypta.ar',
+    defaultValue: 'https://crm.lacrypta.ar',
   );
 
   /// Trailing slashes are stripped so path concatenation is unambiguous — and

@@ -9,7 +9,7 @@ print from inside a host Android WebView and has no offline handling.
 
 | | |
 |---|---|
-| **Backend** | `https://events.lacrypta.ar` (the La Crypta CRM) |
+| **Backend** | `https://crm.lacrypta.ar` (the La Crypta CRM) |
 | **Stack** | Flutter 3.29+ · Riverpod 3 (hand-written providers) · go_router |
 | **Min SDK** | Android 24 · iOS 15.5 |
 
