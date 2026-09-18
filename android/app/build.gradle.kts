@@ -62,6 +62,20 @@ android {
     }
 }
 
+// Release APKs carry exactly the two ARM ABIs. Plugins ship x86_64 .so files,
+// but with `--target-platform android-arm,android-arm64` the Flutter engine is
+// not built for x86_64 — so that dir would hold plugin libs and no
+// libflutter.so, and an x86_64 device would pick it and crash on launch instead
+// of refusing to install. An abiFilters in buildTypes can't fix this: AGP
+// unions it with the full list the Flutter plugin writes into defaultConfig.
+// Release only, so `flutter run` on an x86_64 emulator keeps working.
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.packaging.jniLibs.excludes.add("lib/x86_64/**")
+        variant.packaging.jniLibs.excludes.add("lib/x86/**")
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
