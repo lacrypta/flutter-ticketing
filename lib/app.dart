@@ -4,12 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/router/app_router.dart';
 import 'core/theme/lc_theme.dart';
+import 'data/market/market_cache.dart';
+import 'data/market/market_quote.dart';
 
 class LacryptaTicketingApp extends ConsumerWidget {
   const LacryptaTicketingApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Subscribe without watching: a watch would rebuild MaterialApp every
+    // minute. The listen keeps the poller alive so a gift print reads a
+    // ready snapshot instead of hitting the network.
+    ref.listen<MarketQuote?>(marketCacheProvider, (_, _) {});
+
     return MaterialApp.router(
       title: 'La Crypta Ticketing',
       debugShowCheckedModeBanner: false,

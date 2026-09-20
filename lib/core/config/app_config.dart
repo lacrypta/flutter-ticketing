@@ -29,6 +29,9 @@ abstract final class AppConfig {
 }
 
 /// Market data feeds, used only to price receipts.
+///
+/// `/json/ARS` is enough for both printed prices: `ARS.price` is BTC in pesos
+/// and `BTC.price` is BTC in dollars, so there is no second FX round-trip.
 abstract final class MarketConfig {
   static final Uri blockHeight = Uri.parse(
     'https://mempool.space/api/blocks/tip/height',

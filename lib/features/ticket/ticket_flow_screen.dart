@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -6,7 +8,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/lc_colors.dart';
 import '../../core/theme/lc_metrics.dart';
 import '../../core/theme/lc_typography.dart';
-import '../../data/api/api_providers.dart';
+import '../../data/market/market_cache.dart';
 import '../../data/printer/gift_artwork.dart';
 import '../../data/printer/printer_channel.dart';
 import '../../domain/ticket/gift.dart';
@@ -42,6 +44,13 @@ class TicketFlowScreen extends ConsumerWidget {
     final history = ref.watch(historyProvider);
 
     ref.listen(ticketFlowProvider, (previous, next) {
+      if (previous?.catalogue != next.catalogue) {
+        unawaited(
+          ref
+              .read(giftArtworkProvider)
+              .prefetch(next.catalogue.values.map((gift) => gift.imageUrl)),
+        );
+      }
       if (previous?.phase == next.phase) return;
       _recordHistory(ref, next);
     });
@@ -122,9 +131,11 @@ class TicketFlowScreen extends ConsumerWidget {
     final claimedAt = DateTime.now();
     controller.recordClaim(ClaimedGift(gift: claimed, claimedAt: claimedAt));
 
-    final artwork = await GiftArtwork(
-      ref.read(dioProvider),
-    ).fetch(claimed.imageUrl);
+    final artwork = await ref.read(giftArtworkProvider).fetch(claimed.imageUrl);
+
+    // Cached quote only — never await a refresh here. A cold cache just
+    // omits the market lines; the benefit is already consumed.
+    final quote = ref.read(marketCacheProvider);
 
     final error = await PrinterChannel.printVoucher(
       image: artwork,
@@ -132,6 +143,9 @@ class TicketFlowScreen extends ConsumerWidget {
       event: ticket?.eventName ?? '',
       date: DateFormat('dd/MM/yy HH:mm', 'es_AR').format(claimedAt),
       ticket: _short(ticket?.token ?? ''),
+      block: quote?.blockLine,
+      btcUsd: quote?.btcUsdLine,
+      satArs: quote?.satArsLine,
     );
 
     // The benefit is already consumed at this point, so a printer failure must

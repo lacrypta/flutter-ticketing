@@ -17,12 +17,19 @@ class PrinterChannel {
   }
 
   /// Prints one benefit voucher. Returns null on success, or a message to show.
+  ///
+  /// [block], [btcUsd] and [satArs] are the cached market lines. Empty means
+  /// the cache is still cold — the voucher prints without them rather than
+  /// waiting on the network.
   static Future<String?> printVoucher({
     required String gift,
     required String event,
     required String date,
     required String ticket,
     Uint8List? image,
+    String? block,
+    String? btcUsd,
+    String? satArs,
   }) async {
     try {
       final code = await _ch.invokeMethod<int>('printVoucher', {
@@ -33,6 +40,9 @@ class PrinterChannel {
         // Pre-decoded 1-bit PNG bytes; null when there is no artwork or the
         // fetch failed. Never blocks the voucher.
         'image': image,
+        'block': block,
+        'btcUsd': btcUsd,
+        'satArs': satArs,
       });
       return _message(code ?? -1);
     } on MissingPluginException {

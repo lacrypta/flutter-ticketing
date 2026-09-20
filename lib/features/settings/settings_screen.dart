@@ -10,8 +10,8 @@ import '../../core/theme/lc_colors.dart';
 import '../../core/theme/lc_metrics.dart';
 import '../../core/theme/lc_typography.dart';
 import '../../data/api/api_providers.dart';
+import '../../data/market/market_cache.dart';
 import '../../data/printer/printer_channel.dart';
-
 import '../../data/settings/settings_repository.dart';
 import '../../ui/components/lc_buttons.dart';
 import '../../ui/components/lc_screen.dart';
@@ -147,14 +147,14 @@ class SettingsScreen extends ConsumerWidget {
 
 /// Printer status plus a test print — staff check paper before doors open, and
 /// it is the only way to tell a missing printer from a jammed one.
-class _PrinterTest extends StatefulWidget {
+class _PrinterTest extends ConsumerStatefulWidget {
   const _PrinterTest();
 
   @override
-  State<_PrinterTest> createState() => _PrinterTestState();
+  ConsumerState<_PrinterTest> createState() => _PrinterTestState();
 }
 
-class _PrinterTestState extends State<_PrinterTest> {
+class _PrinterTestState extends ConsumerState<_PrinterTest> {
   bool? _available;
   bool _busy = false;
 
@@ -168,11 +168,15 @@ class _PrinterTestState extends State<_PrinterTest> {
 
   Future<void> _test() async {
     setState(() => _busy = true);
+    final quote = ref.read(marketCacheProvider);
     final error = await PrinterChannel.printVoucher(
       gift: 'PRUEBA',
       event: 'La Crypta Ticketing',
       date: DateFormat('dd/MM/yy HH:mm', 'es_AR').format(DateTime.now()),
       ticket: '',
+      block: quote?.blockLine,
+      btcUsd: quote?.btcUsdLine,
+      satArs: quote?.satArsLine,
     );
     if (!mounted) return;
     setState(() => _busy = false);
