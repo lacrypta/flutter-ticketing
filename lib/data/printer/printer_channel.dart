@@ -30,6 +30,8 @@ class PrinterChannel {
     String? block,
     String? btcUsd,
     String? satArs,
+    String? lnurl,
+    String? claimLine,
   }) async {
     try {
       final code = await _ch.invokeMethod<int>('printVoucher', {
@@ -43,6 +45,8 @@ class PrinterChannel {
         'block': block,
         'btcUsd': btcUsd,
         'satArs': satArs,
+        'lnurl': lnurl,
+        'claimLine': claimLine,
       });
       return _message(code ?? -1);
     } on MissingPluginException {

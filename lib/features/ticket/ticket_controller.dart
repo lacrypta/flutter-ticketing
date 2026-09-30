@@ -146,13 +146,20 @@ class TicketFlowController extends Notifier<TicketFlowState> {
       final floor = Future<void>.delayed(LcMotion.minimumLoad);
       final result = await request;
       await floor;
+      final catalogue = <String, Gift>{};
+      final counts = Map<String, int>.from(result.counts);
+      for (final json in result.catalogue) {
+        if (json['item_key'] == null) continue;
+        final gift = Gift.fromJson(json);
+        catalogue[gift.id] = gift;
+        if (!gift.isTreasure) continue;
+        // A treasure is one chest, not a quantity of the shared item key.
+        counts.remove(json['item_key'].toString());
+        counts[gift.id] = 1;
+      }
       state = state.copyWith(
-        gifts: result.counts,
-        catalogue: {
-          for (final json in result.catalogue)
-            if (json['item_key'] != null)
-              json['item_key'].toString(): Gift.fromJson(json),
-        },
+        gifts: counts,
+        catalogue: catalogue,
         phase: TicketPhase.gifts,
       );
     } on InvalidTicketException {
@@ -185,6 +192,13 @@ class TicketFlowController extends Notifier<TicketFlowState> {
 
     state = state.copyWith(claimingGiftId: gift.id, clearError: true);
     try {
+      if (gift.isTreasure) {
+        // Printing the LUD-03 is the handoff. The wallet still withdraws later,
+        // so this must not burn the chest on the gift-quantity endpoint.
+        final remaining = Map<String, int>.from(state.gifts)..remove(gift.id);
+        state = state.copyWith(gifts: remaining, clearClaiming: true);
+        return gift;
+      }
       final remaining = await ref
           .read(ticketingApiProvider)
           .consumeGift(ticket.token, gift.id);
