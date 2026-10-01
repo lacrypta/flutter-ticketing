@@ -21,6 +21,7 @@ import '../../ui/components/lc_surface.dart';
 import '../../ui/components/lc_tabular.dart';
 import '../history/history_controller.dart';
 import 'ticket_controller.dart';
+import 'voucher_preview.dart';
 
 /// One route, many phases — the flow is a state machine, not a stack, so
 /// putting each phase on the Navigator would let the operator back into a
@@ -138,24 +139,50 @@ class TicketFlowScreen extends ConsumerWidget {
     final quote = ref.read(marketCacheProvider);
 
     final sats = claimed.satsAmount;
+    final claimLine = claimed.isTreasure && sats != null
+        ? 'RECLAMÁ ${NumberFormat.decimalPattern('es_AR').format(sats)} sats'
+        : null;
+    final lnurl = claimed.isTreasure ? claimed.lnurl : null;
+    final event = ticket?.eventName ?? '';
+    final date = DateFormat('dd/MM/yy HH:mm', 'es_AR').format(claimedAt);
+
+    final canPrint = await PrinterChannel.isAvailable();
+    if (!canPrint) {
+      if (context.mounted) {
+        await showVoucherPreview(
+          context,
+          gift: claimed.label,
+          event: event,
+          date: date,
+          imageUrl: claimed.imageUrl,
+          lnurl: lnurl,
+          claimLine: claimLine,
+          giftId: claimed.id,
+        );
+      }
+      return;
+    }
+
     final error = await PrinterChannel.printVoucher(
       image: artwork,
       gift: claimed.label,
-      event: ticket?.eventName ?? '',
-      date: DateFormat('dd/MM/yy HH:mm', 'es_AR').format(claimedAt),
+      event: event,
+      date: date,
       ticket: _short(ticket?.token ?? ''),
       block: quote?.blockLine,
       btcUsd: quote?.btcUsdLine,
       satArs: quote?.satArsLine,
-      lnurl: claimed.isTreasure ? claimed.lnurl : null,
-      claimLine: claimed.isTreasure && sats != null
-          ? 'RECLAMÁ ${NumberFormat.decimalPattern('es_AR').format(sats)} sats'
-          : null,
+      lnurl: lnurl,
+      claimLine: claimLine,
+      giftId: claimed.id,
     );
 
-    // The benefit is already consumed at this point, so a printer failure must
-    // be loud: staff have to hand it over without the voucher.
-    if (error != null && context.mounted) {
+    // Nothing came out of a printer. A missing head (emulator, phone) and a
+    // hardware fault both leave staff holding the benefit, so the same slip
+    // goes on screen. Paper-out and overheat stay as a banner too: those are
+    // a real printer that needs attention.
+    if (!context.mounted || error == null) return;
+    if (error == 'Sin papel' || error == 'Impresora sobrecalentada') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$error — entregá ${claimed.label} igual'),
@@ -163,6 +190,16 @@ class TicketFlowScreen extends ConsumerWidget {
         ),
       );
     }
+    await showVoucherPreview(
+      context,
+      gift: claimed.label,
+      event: event,
+      date: date,
+      imageUrl: claimed.imageUrl,
+      lnurl: lnurl,
+      claimLine: claimLine,
+      giftId: claimed.id,
+    );
   }
 
   void _recordHistory(WidgetRef ref, TicketFlowState state) {

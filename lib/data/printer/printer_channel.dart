@@ -32,6 +32,7 @@ class PrinterChannel {
     String? satArs,
     String? lnurl,
     String? claimLine,
+    String? giftId,
   }) async {
     try {
       final code = await _ch.invokeMethod<int>('printVoucher', {
@@ -47,6 +48,7 @@ class PrinterChannel {
         'satArs': satArs,
         'lnurl': lnurl,
         'claimLine': claimLine,
+        'giftId': giftId,
       });
       return _message(code ?? -1);
     } on MissingPluginException {

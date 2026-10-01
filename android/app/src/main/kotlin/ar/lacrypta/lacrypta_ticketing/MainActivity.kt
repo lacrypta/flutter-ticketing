@@ -161,6 +161,10 @@ class MainActivity : FlutterActivity() {
         // on a table and left in the venue. It only needs to say what it is.
         p.setPrintAppendString("--------------------------------", normal)
         str(v, "date")?.let { p.setPrintAppendString(it, fmt(22, Layout.Alignment.ALIGN_NORMAL)) }
+        str(v, "giftId")?.let {
+            p.setPrintLine(8)
+            p.setPrintAppendString(it, fmt(18, Layout.Alignment.ALIGN_CENTER))
+        }
 
         val block = str(v, "block")
         val btcUsd = str(v, "btcUsd")
