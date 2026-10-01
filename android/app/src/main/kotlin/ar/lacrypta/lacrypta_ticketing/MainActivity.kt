@@ -145,6 +145,18 @@ class MainActivity : FlutterActivity() {
             p.setPrintLine(6)
         }
 
+        // A Sats Treasure hands the attendee a scannable LUD-03, then the amount.
+        val lnurl = str(v, "lnurl")
+        if (lnurl != null) {
+            p.setPrintLine(8)
+            p.setPrintAppendQRCode(lnurl, 300, 300, Layout.Alignment.ALIGN_CENTER)
+            p.setPrintLine(10)
+            str(v, "claimLine")?.let {
+                p.setPrintAppendString(it, fmt(34, Layout.Alignment.ALIGN_CENTER))
+                p.setPrintLine(8)
+            }
+        }
+
         // No attendee name, no ticket id: a voucher gets handed over, dropped
         // on a table and left in the venue. It only needs to say what it is.
         p.setPrintAppendString("--------------------------------", normal)

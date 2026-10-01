@@ -137,6 +137,7 @@ class TicketFlowScreen extends ConsumerWidget {
     // omits the market lines; the benefit is already consumed.
     final quote = ref.read(marketCacheProvider);
 
+    final sats = claimed.satsAmount;
     final error = await PrinterChannel.printVoucher(
       image: artwork,
       gift: claimed.label,
@@ -146,6 +147,10 @@ class TicketFlowScreen extends ConsumerWidget {
       block: quote?.blockLine,
       btcUsd: quote?.btcUsdLine,
       satArs: quote?.satArsLine,
+      lnurl: claimed.isTreasure ? claimed.lnurl : null,
+      claimLine: claimed.isTreasure && sats != null
+          ? 'RECLAMÁ ${NumberFormat.decimalPattern('es_AR').format(sats)} sats'
+          : null,
     );
 
     // The benefit is already consumed at this point, so a printer failure must
