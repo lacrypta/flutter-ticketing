@@ -113,6 +113,7 @@ class TicketFlowScreen extends ConsumerWidget {
         TicketPhase.gifts => _GiftsView(
           state: state,
           onClaim: (gift) => _claim(context, ref, gift),
+          onSelectScope: controller.selectGiftScope,
           onScanAgain: onScanAgain,
         ),
       },
@@ -126,6 +127,7 @@ class TicketFlowScreen extends ConsumerWidget {
     // The server call completes FIRST. Printing before it would put a voucher
     // in someone's hand for a benefit a 409 then refuses — a discrepancy nobody
     // at the door can undo.
+    if (!gift.canPrint) return;
     final claimed = await controller.claimGift(gift);
     if (claimed == null) return;
 
@@ -422,20 +424,105 @@ class _AlreadyCheckedView extends StatelessWidget {
   }
 }
 
+class _BenefitTabs extends StatelessWidget {
+  const _BenefitTabs({required this.userView, required this.onSelectScope});
+
+  final bool userView;
+  final ValueChanged<bool> onSelectScope;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: LcColors.surface2,
+        borderRadius: LcRadius.cardAll,
+        border: Border.all(color: LcColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          children: [
+            Expanded(
+              child: _BenefitTab(
+                label: 'Ticket',
+                selected: !userView,
+                onTap: () => onSelectScope(false),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _BenefitTab(
+                label: 'Usuario',
+                selected: userView,
+                onTap: () => onSelectScope(true),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BenefitTab extends StatelessWidget {
+  const _BenefitTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: LcMotion.fast,
+          height: 48,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? LcColors.accent : LcColors.surface2,
+            borderRadius: LcRadius.cardAll,
+          ),
+          child: Text(
+            label,
+            style: LcType.button.copyWith(
+              color: selected ? LcColors.onAccent : LcColors.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _GiftsView extends StatelessWidget {
   const _GiftsView({
     required this.state,
     required this.onClaim,
+    required this.onSelectScope,
     required this.onScanAgain,
   });
 
   final TicketFlowState state;
   final Future<void> Function(Gift) onClaim;
+  final ValueChanged<bool> onSelectScope;
   final VoidCallback onScanAgain;
 
   @override
   Widget build(BuildContext context) {
-    final units = state.giftUnits;
+    final units = state.visibleBenefits;
+    final gifts = [for (final gift in units) if (!gift.isTreasure) gift];
+    final treasures = [for (final gift in units) if (gift.isTreasure) gift];
+    final userView = state.showUserGifts;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -443,7 +530,9 @@ class _GiftsView extends StatelessWidget {
         const SizedBox(height: LcSpace.md),
         LcEyebrow('beneficios · ${state.ticket?.attendeeName ?? ''}'),
         const SizedBox(height: LcSpace.sm),
-        Text(units.isEmpty ? 'Sin beneficios' : 'Beneficios', style: LcType.h1),
+        Text('Beneficios', style: LcType.h1),
+        const SizedBox(height: LcSpace.md),
+        _BenefitTabs(userView: userView, onSelectScope: onSelectScope),
         const SizedBox(height: LcSpace.lg),
 
         if (state.error != null) ...[
@@ -451,22 +540,51 @@ class _GiftsView extends StatelessWidget {
           const SizedBox(height: LcSpace.md),
         ],
 
-        // One row per unit — three pizzas render three rows, so claiming is
-        // always one tap and never a quantity stepper.
-        for (var i = 0; i < units.length; i++) ...[
-          _GiftRow(
-            gift: units[i],
-            busy: state.claimingGiftId == units[i].id,
-            enabled: state.claimingGiftId == null,
-            onTap: () => onClaim(units[i]),
-          ),
-          const SizedBox(height: LcSpace.sm),
-        ],
+        if (state.scoped) ...[
+          if (gifts.isNotEmpty) ...[
+            const LcEyebrow('Gifts'),
+            const SizedBox(height: LcSpace.sm),
+            for (final gift in gifts) ...[
+              _BenefitRow(
+                gift: gift,
+                busy: state.claimingGiftId == gift.id,
+                enabled: state.claimingGiftId == null,
+                onTap: () => onClaim(gift),
+              ),
+              const SizedBox(height: LcSpace.sm),
+            ],
+          ],
+          if (treasures.isNotEmpty) ...[
+            const SizedBox(height: LcSpace.md),
+            const LcEyebrow('Sats Treasuries'),
+            const SizedBox(height: LcSpace.sm),
+            for (final gift in treasures) ...[
+              _BenefitRow(
+                gift: gift,
+                busy: state.claimingGiftId == gift.id,
+                enabled: state.claimingGiftId == null,
+                onTap: () => onClaim(gift),
+              ),
+              const SizedBox(height: LcSpace.sm),
+            ],
+          ],
+        ] else
+          for (var i = 0; i < units.length; i++) ...[
+            _GiftRow(
+              gift: units[i],
+              busy: state.claimingGiftId == units[i].id,
+              enabled: state.claimingGiftId == null,
+              onTap: () => onClaim(units[i]),
+            ),
+            const SizedBox(height: LcSpace.sm),
+          ],
 
         if (units.isEmpty)
           LcCard(
             child: Text(
-              'Esta entrada no tiene beneficios pendientes.',
+              userView
+                  ? 'Este usuario no tiene beneficios en el evento.'
+                  : 'Esta entrada no tiene beneficios pendientes.',
               style: LcType.bodyMuted,
             ),
           ),
@@ -506,8 +624,8 @@ class _GiftsView extends StatelessWidget {
   }
 }
 
-class _GiftRow extends StatelessWidget {
-  const _GiftRow({
+class _BenefitRow extends StatelessWidget {
+  const _BenefitRow({
     required this.gift,
     required this.busy,
     required this.enabled,
@@ -518,6 +636,56 @@ class _GiftRow extends StatelessWidget {
   final bool busy;
   final bool enabled;
   final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = gift.printedLocally ? 'Impreso' : gift.statusLabel;
+    if (!gift.canPrint) {
+      return LcCard(
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(gift.label, style: LcType.body),
+                  if (gift.detail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(gift.detail, style: LcType.caption),
+                  ],
+                ],
+              ),
+            ),
+            if (status != null && status.isNotEmpty)
+              Text(status, style: LcType.caption),
+          ],
+        ),
+      );
+    }
+    return _GiftRow(
+      gift: gift,
+      busy: busy,
+      enabled: enabled,
+      onTap: onTap,
+      detail: gift.detail,
+    );
+  }
+}
+
+class _GiftRow extends StatelessWidget {
+  const _GiftRow({
+    required this.gift,
+    required this.busy,
+    required this.enabled,
+    required this.onTap,
+    this.detail,
+  });
+
+  final Gift gift;
+  final bool busy;
+  final bool enabled;
+  final VoidCallback onTap;
+  final String? detail;
 
   @override
   Widget build(BuildContext context) {
@@ -545,8 +713,10 @@ class _GiftRow extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(gift.label, style: LcType.rowTitle),
-                    const SizedBox(height: 2),
-                    Text('${gift.priceSats} SAT', style: LcType.rowMeta),
+                    if (detail != null && detail!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(detail!, style: LcType.rowMeta),
+                    ],
                   ],
                 ),
               ),

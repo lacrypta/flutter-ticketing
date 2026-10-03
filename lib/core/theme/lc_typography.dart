@@ -57,7 +57,7 @@ abstract final class LcType {
 
   /// The biggest thing on any screen. CSS `clamp(3.2rem, 18vw, 5.6rem)`.
   static TextStyle hero(double width) => _base(
-    size: (width * 0.18).clamp(51.2, 89.6),
+    size: (width * 0.2).clamp(62, 108),
     weight: FontWeight.w800,
     height: 0.9,
     trackingEm: -0.035,
@@ -66,28 +66,28 @@ abstract final class LcType {
   /// Slightly restrained hero, for screens that also carry a data block.
   /// CSS `clamp(2.5rem, 15vw, 4.2rem)`.
   static TextStyle display(double width) => _base(
-    size: (width * 0.15).clamp(40, 67.2),
+    size: (width * 0.17).clamp(48, 80),
     weight: FontWeight.w800,
     height: 0.92,
     trackingEm: -0.03,
   );
 
   static final TextStyle h1 = _base(
-    size: 32,
+    size: 40,
     weight: FontWeight.w700,
     height: 1,
     trackingEm: -0.025,
   );
 
   static final TextStyle h2 = _base(
-    size: 24,
+    size: 30,
     weight: FontWeight.w700,
     height: 1,
     trackingEm: -0.02,
   );
 
   static final TextStyle h3 = _base(
-    size: 20,
+    size: 25,
     weight: FontWeight.w600,
     height: 1.1,
     trackingEm: -0.015,
@@ -95,7 +95,7 @@ abstract final class LcType {
 
   // ── Body ───────────────────────────────────────────────────────────────
   static final TextStyle body = _base(
-    size: 15,
+    size: 19,
     weight: FontWeight.w500,
     height: 1.4,
   );
@@ -103,21 +103,21 @@ abstract final class LcType {
   static final TextStyle bodyMuted = body.copyWith(color: LcColors.textMuted);
 
   static final TextStyle notice = _base(
-    size: 14.7,
+    size: 18,
     weight: FontWeight.w500,
     height: 1.4,
     color: LcColors.amber,
   );
 
   static final TextStyle caption = _base(
-    size: 14,
+    size: 17,
     weight: FontWeight.w500,
     height: 1.3,
     color: LcColors.textMuted,
   );
 
   static final TextStyle footer = _base(
-    size: 11.8,
+    size: 15,
     weight: FontWeight.w700,
     height: 1.3,
     color: LcColors.textFooter,
@@ -128,7 +128,7 @@ abstract final class LcType {
   /// brand deliberately does *not* letterspace its eyebrows, which is unusual
   /// and easy to "fix" by accident.
   static final TextStyle eyebrow = _base(
-    size: 12.2,
+    size: 15,
     weight: FontWeight.w800,
     height: 1.2,
     color: LcColors.textMuted,
@@ -141,7 +141,7 @@ abstract final class LcType {
   // ── Controls ───────────────────────────────────────────────────────────
   /// The hero scan CTA. CSS `clamp(1.35rem, 7vw, 1.9rem)`.
   static TextStyle heroButton(double width) => _base(
-    size: (width * 0.07).clamp(21.6, 30.4),
+    size: (width * 0.08).clamp(26, 36),
     weight: FontWeight.w800,
     height: 1,
     trackingEm: -0.02,
@@ -149,7 +149,7 @@ abstract final class LcType {
   );
 
   static final TextStyle button = _base(
-    size: 18.4,
+    size: 22,
     weight: FontWeight.w800,
     height: 1,
     trackingEm: -0.015,
@@ -162,7 +162,7 @@ abstract final class LcType {
 
   /// Small uppercase action text (`.smallSecondaryButton`).
   static final TextStyle buttonSmall = _base(
-    size: 12.5,
+    size: 16,
     weight: FontWeight.w800,
     height: 1,
     color: LcColors.textPrimary,
@@ -170,7 +170,7 @@ abstract final class LcType {
 
   /// A gift row's label.
   static final TextStyle rowTitle = _base(
-    size: 17.3,
+    size: 22,
     weight: FontWeight.w800,
     height: 1,
     trackingEm: -0.015,
@@ -179,7 +179,7 @@ abstract final class LcType {
 
   /// The uppercase sub-label under a row title ("1 SAT").
   static final TextStyle rowMeta = _base(
-    size: 12.5,
+    size: 16,
     weight: FontWeight.w800,
     height: 1.2,
     color: LcColors.onAccent,
@@ -187,14 +187,14 @@ abstract final class LcType {
 
   /// Status chips and count badges.
   static final TextStyle pill = _base(
-    size: 11.5,
+    size: 14,
     weight: FontWeight.w800,
     height: 1,
   );
 
   /// A big standalone number (the history counter).
   static final TextStyle statNumber = _base(
-    size: 37.6,
+    size: 46,
     weight: FontWeight.w800,
     height: 0.9,
     trackingEm: -0.03,

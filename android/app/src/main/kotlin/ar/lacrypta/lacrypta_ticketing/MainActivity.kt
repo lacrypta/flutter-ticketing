@@ -119,9 +119,14 @@ class MainActivity : FlutterActivity() {
         if (status == SdkResult.SDK_PRN_STATUS_PAPEROUT) return status
 
         val normal = fmt(22, Layout.Alignment.ALIGN_NORMAL)
-        logoBitmap()?.let {
-            p.setPrintAppendBitmap(it, Layout.Alignment.ALIGN_CENTER)
-            p.setPrintLine(30)
+        val lnurl = str(v, "lnurl")
+        // A treasure slip leads with the chest and the LUD-03. The venue logo
+        // sits above that and eats the first thing the attendee sees.
+        if (lnurl == null) {
+            logoBitmap()?.let {
+                p.setPrintAppendBitmap(it, Layout.Alignment.ALIGN_CENTER)
+                p.setPrintLine(30)
+            }
         }
 
         str(v, "event")?.let { p.setPrintAppendString(it, fmt(26, Layout.Alignment.ALIGN_CENTER)) }
@@ -146,10 +151,10 @@ class MainActivity : FlutterActivity() {
         }
 
         // A Sats Treasure hands the attendee a scannable LUD-03, then the amount.
-        val lnurl = str(v, "lnurl")
         if (lnurl != null) {
             p.setPrintLine(8)
-            p.setPrintAppendQRCode(lnurl, 300, 300, Layout.Alignment.ALIGN_CENTER)
+            // Full 58mm head (384 dots), same width as the gift artwork.
+            p.setPrintAppendQRCode(lnurl, 384, 384, Layout.Alignment.ALIGN_CENTER)
             p.setPrintLine(10)
             str(v, "claimLine")?.let {
                 p.setPrintAppendString(it, fmt(34, Layout.Alignment.ALIGN_CENTER))

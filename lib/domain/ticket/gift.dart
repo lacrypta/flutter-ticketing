@@ -10,6 +10,11 @@ class Gift {
     this.priceSats = 1,
     this.lnurl,
     this.satsAmount,
+    this.kind = 'gift',
+    this.quantityLabel,
+    this.statusLabel,
+    this.claimed = false,
+    this.printedLocally = false,
   });
 
   factory Gift.fromJson(Map<String, dynamic> json) {
@@ -28,8 +33,55 @@ class Gift {
       imageUrl: json['image_url']?.toString(),
       lnurl: json['lnurl']?.toString(),
       satsAmount: sats is num ? sats.toInt() : int.tryParse('$sats'),
+      kind: isTreasure ? 'sats_treasure' : 'gift',
     );
   }
+
+  /// A row from `ticket_benefits` / `user_benefits`, the same list the CRM
+  /// check-in page renders.
+  factory Gift.fromBenefit(Map<String, dynamic> json) {
+    final kind = json['kind']?.toString() ?? 'gift';
+    final claimCode = json['claim_code']?.toString();
+    final key = json['item_key']?.toString() ?? '';
+    final explicitId = json['id']?.toString();
+    final name = json['name']?.toString();
+    final sats = json['sats_amount'];
+    final claimed = json['claimed'] == true;
+    return Gift(
+      id: explicitId != null && explicitId.isNotEmpty
+          ? explicitId
+          : (kind == 'sats_treasure' && claimCode != null && claimCode.isNotEmpty
+              ? claimCode
+              : key),
+      label: (name == null || name.isEmpty) ? key : name,
+      imageUrl: json['image_url']?.toString(),
+      lnurl: json['lnurl']?.toString(),
+      satsAmount: sats is num ? sats.toInt() : int.tryParse('$sats'),
+      kind: kind,
+      quantityLabel: json['quantity_label']?.toString(),
+      statusLabel: json['status_label']?.toString(),
+      claimed: claimed,
+    );
+  }
+
+  Gift copyWith({
+    bool? claimed,
+    bool? printedLocally,
+    String? statusLabel,
+    bool clearLnurl = false,
+  }) => Gift(
+    id: id,
+    label: label,
+    imageUrl: imageUrl,
+    priceSats: priceSats,
+    lnurl: clearLnurl ? null : lnurl,
+    satsAmount: satsAmount,
+    kind: kind,
+    quantityLabel: quantityLabel,
+    statusLabel: statusLabel ?? this.statusLabel,
+    claimed: claimed ?? this.claimed,
+    printedLocally: printedLocally ?? this.printedLocally,
+  );
 
   final String id;
   final String label;
@@ -45,8 +97,31 @@ class Gift {
   /// Sats frozen on that chest.
   final int? satsAmount;
 
+  final String kind;
+  final String? quantityLabel;
+  final String? statusLabel;
+
+  /// Server says this row was already handed out or paid.
+  final bool claimed;
+
+  /// Printed in this session. The chest stays READY on the server.
+  final bool printedLocally;
+
   bool get isTreasure =>
-      lnurl != null && lnurl!.isNotEmpty && (satsAmount ?? 0) > 0;
+      kind == 'sats_treasure' ||
+      (lnurl != null && lnurl!.isNotEmpty && (satsAmount ?? 0) > 0);
+
+  bool get canPrint =>
+      !claimed &&
+      !printedLocally &&
+      (isTreasure ? (lnurl != null && lnurl!.isNotEmpty) : true);
+
+  String get detail {
+    if (!isTreasure) return '';
+    if (quantityLabel != null && quantityLabel!.isNotEmpty) return quantityLabel!;
+    if (satsAmount != null && satsAmount! > 0) return '$satsAmount sats';
+    return '';
+  }
 
   @override
   bool operator ==(Object other) =>
