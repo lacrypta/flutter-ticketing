@@ -4,6 +4,7 @@ import 'package:lacrypta_ticketing/core/error/app_exception.dart';
 import 'package:lacrypta_ticketing/data/api/api_providers.dart';
 import 'package:lacrypta_ticketing/data/api/ticketing_api.dart';
 import 'package:lacrypta_ticketing/data/api/ticketing_dto.dart';
+import 'package:lacrypta_ticketing/domain/ticket/gift.dart';
 import 'package:lacrypta_ticketing/features/ticket/ticket_controller.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -89,6 +90,142 @@ void main() {
       await controller().loadBenefits();
 
       expect(state().error, 'No se pudieron cargar');
+    });
+  });
+
+  group('a printed treasure stays claimable', () {
+    const lnurl = 'lnurl1dp68gurn8ghj7mrww4exctt5dahkccn00qhxget8wfjkxmmww3jhxaq0v3jk6mnyv4ej7mrww4exctn9v4jk6mnyv4ej7mr0va5kuer';
+    final treasure = {
+      'item_key': 'treasure_chest',
+      'claim_code': '0024f7c1-4b87-41f9-939f-f7f96ff022a2',
+      'quantity': 1,
+      'kind': 'sats_treasure',
+      'name': 'Treasure chest',
+      'sats_amount': 210,
+      'lnurl': lnurl,
+    };
+
+    Future<void> load() async {
+      when(() => api.status(any())).thenAnswer((_) async => _status(checkedIn: true));
+      when(() => api.gifts(any())).thenAnswer(
+        (_) async => CheckinGiftsDto(
+          counts: <String, int>{},
+          catalogue: [treasure],
+        ),
+      );
+      await controller().open('token');
+      await controller().loadBenefits();
+    }
+
+    test('printing removes it locally and never consumes it', () async {
+      await load();
+      final gift = state().giftUnits.single;
+
+      final printed = await controller().claimGift(gift);
+
+      expect(printed?.lnurl, lnurl);
+      expect(state().giftUnits, isEmpty);
+      verifyNever(() => api.consumeGift(any(), any()));
+      controller().recordClaim(
+        ClaimedGift(gift: printed!, claimedAt: DateTime.utc(2026, 10, 2, 17)),
+      );
+      expect(state().claimed.single.gift.id, gift.id);
+    });
+
+    test('the next check-in reprints the same LUD-03 while it is still ready', () async {
+      await load();
+      final gift = state().giftUnits.single;
+      await controller().claimGift(gift);
+
+      await load();
+
+      final again = state().giftUnits.single;
+      expect(again.id, gift.id);
+      expect(again.lnurl, lnurl);
+      expect(state().claimed, isEmpty);
+    });
+
+    test('the door opens on the ticket and can switch to the user list', () async {
+      final ticketGift = {
+        'kind': 'gift',
+        'item_key': 'tarjeta_lawallet',
+        'name': 'Tarjeta LaWallet',
+        'quantity_label': '×1',
+        'status_label': 'Reclamado',
+        'claimed': true,
+        'printable': false,
+      };
+      final ticketChest = {
+        'kind': 'sats_treasure',
+        'item_key': 'treasure_chest',
+        'claim_code': '0024f7c1-4b87-41f9-939f-f7f96ff022a2',
+        'name': 'Treasure chest',
+        'sats_amount': 210,
+        'quantity_label': '210 sats',
+        'status_label': 'Disponible',
+        'claimed': false,
+        'printable': true,
+        'lnurl': lnurl,
+      };
+      final otherChest = {
+        ...ticketChest,
+        'claim_code': 'ebf2aade-2da4-4b10-bea5-d08875530840',
+        'sats_amount': 100,
+        'quantity_label': '100 sats',
+      };
+      when(() => api.status(any())).thenAnswer((_) async => _status(checkedIn: true));
+      when(() => api.gifts(any())).thenAnswer(
+        (_) async => CheckinGiftsDto.fromJson({
+          'gift_data': <String, dynamic>{},
+          'gifts': <Map<String, dynamic>>[],
+          'ticket_benefits': [ticketGift, ticketChest],
+          'user_benefits': [ticketGift, ticketChest, otherChest],
+        }),
+      );
+
+      await controller().open('token');
+      await controller().loadBenefits();
+
+      expect(state().showUserGifts, isFalse);
+      expect(state().visibleBenefits.map((gift) => gift.id), [
+        'tarjeta_lawallet',
+        '0024f7c1-4b87-41f9-939f-f7f96ff022a2',
+      ]);
+      expect(state().visibleBenefits.first.canPrint, isFalse);
+
+      controller().toggleGiftScope();
+
+      expect(state().showUserGifts, isTrue);
+      expect(state().visibleBenefits, hasLength(3));
+
+      controller().toggleGiftScope();
+      expect(state().showUserGifts, isFalse);
+
+      final printed = await controller().claimGift(state().visibleBenefits[1]);
+      expect(printed?.id, '0024f7c1-4b87-41f9-939f-f7f96ff022a2');
+      expect(state().ticketBenefits[1].printedLocally, isTrue);
+      expect(state().userBenefits[1].printedLocally, isTrue);
+      expect(identical(state().ticketBenefits[1], state().userBenefits[1]), isTrue);
+
+      controller().toggleGiftScope();
+      expect(state().visibleBenefits[1].canPrint, isFalse);
+      expect(state().visibleBenefits[1].statusLabel, 'Impreso');
+    });
+
+    test('a treasure the wallet already claimed does not come back', () async {
+      await load();
+      await controller().claimGift(state().giftUnits.single);
+      when(() => api.gifts(any())).thenAnswer(
+        (_) async => const CheckinGiftsDto(
+          counts: <String, int>{},
+          catalogue: <Map<String, dynamic>>[],
+        ),
+      );
+
+      await controller().open('token');
+      await controller().loadBenefits();
+
+      expect(state().giftUnits, isEmpty);
     });
   });
 

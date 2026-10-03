@@ -5,6 +5,8 @@
 /// which reads only five of the nine fields `GET` actually returns.
 library;
 
+import '../../domain/ticket/gift.dart';
+
 /// `GET /api/checkin/{code}`
 class CheckinStatusDto {
   const CheckinStatusDto({
@@ -109,3 +111,40 @@ GiftData parseGiftData(Object? raw) {
 
 DateTime? _parseDate(Object? raw) =>
     raw is String ? DateTime.tryParse(raw)?.toLocal() : null;
+
+/// Door benefits. [scoped] is set when the server sent the CRM lists.
+class CheckinGiftsDto {
+  const CheckinGiftsDto({
+    required this.counts,
+    required this.catalogue,
+    this.ticketBenefits,
+    this.userBenefits,
+  });
+
+  factory CheckinGiftsDto.fromJson(Map<String, dynamic> json) {
+    final scoped = json.containsKey('ticket_benefits');
+    return CheckinGiftsDto(
+      counts: parseGiftData(json['gift_data']),
+      catalogue: parseGiftCatalogue(json['gifts']),
+      ticketBenefits: scoped ? _benefits(json['ticket_benefits']) : null,
+      userBenefits: scoped ? _benefits(json['user_benefits']) : null,
+    );
+  }
+
+  final GiftData counts;
+  final List<Map<String, dynamic>> catalogue;
+
+  /// Null when the server is an older build without the two lists.
+  final List<Gift>? ticketBenefits;
+  final List<Gift>? userBenefits;
+
+  bool get scoped => ticketBenefits != null;
+
+  static List<Gift> _benefits(Object? raw) {
+    if (raw is! List) return const [];
+    return [
+      for (final row in raw)
+        if (row is Map) Gift.fromBenefit(row.cast<String, dynamic>()),
+    ];
+  }
+}

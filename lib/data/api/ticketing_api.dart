@@ -36,14 +36,9 @@ class TicketingApi {
 
   /// `GET /api/checkin/{code}/gifts` — remaining benefits for this attendee,
   /// with their titles and artwork when the server provides them.
-  Future<({GiftData counts, List<Map<String, dynamic>> catalogue})> gifts(
-    String token,
-  ) => _guard(() async {
+  Future<CheckinGiftsDto> gifts(String token) => _guard(() async {
     final json = await _getJson('/api/checkin/${_encode(token)}/gifts');
-    return (
-      counts: parseGiftData(json['gift_data']),
-      catalogue: parseGiftCatalogue(json['gifts']),
-    );
+    return CheckinGiftsDto.fromJson(json);
   });
 
   /// `POST /api/checkin/{code}/gifts/consume` — claim [quantity] of [giftId].

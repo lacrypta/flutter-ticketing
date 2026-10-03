@@ -40,17 +40,19 @@ Future<void> showVoucherPreview(
               _Artwork(url: imageUrl, fallback: gift),
               if (lnurl != null && lnurl.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                QrImageView(
-                  data: lnurl,
-                  size: 220,
-                  backgroundColor: Colors.white,
-                  eyeStyle: const QrEyeStyle(
-                    eyeShape: QrEyeShape.square,
-                    color: Color(0xFF111111),
-                  ),
-                  dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.square,
-                    color: Color(0xFF111111),
+                LayoutBuilder(
+                  builder: (context, constraints) => QrImageView(
+                    data: lnurl,
+                    size: constraints.maxWidth,
+                    backgroundColor: Colors.white,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Color(0xFF111111),
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Color(0xFF111111),
+                    ),
                   ),
                 ),
               ],

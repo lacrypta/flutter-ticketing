@@ -30,6 +30,11 @@ class TicketFlowState {
     this.ticket,
     this.gifts = const {},
     this.catalogue = const {},
+    this.benefitById = const {},
+    this.ticketBenefitIds = const [],
+    this.userBenefitIds = const [],
+    this.scoped = false,
+    this.showUserGifts = false,
     this.claimed = const [],
     this.error,
     this.busy = false,
@@ -45,6 +50,18 @@ class TicketFlowState {
 
   /// `item_key` → title/artwork, straight from the server.
   final Map<String, Gift> catalogue;
+
+  /// One record per benefit. Both tabs read this, so a claim updates both.
+  final Map<String, Gift> benefitById;
+
+  final List<String> ticketBenefitIds;
+  final List<String> userBenefitIds;
+
+  /// The server sent [ticketBenefits] / [userBenefits].
+  final bool scoped;
+
+  /// False shows the ticket. The next scan always starts there.
+  final bool showUserGifts;
 
   final List<ClaimedGift> claimed;
   final String? error;
@@ -64,12 +81,31 @@ class TicketFlowState {
         catalogue[entry.key] ?? Gift(id: entry.key, label: entry.key),
   ];
 
+  List<Gift> get ticketBenefits => _giftsFor(ticketBenefitIds);
+
+  List<Gift> get userBenefits => _giftsFor(userBenefitIds);
+
+  List<Gift> get visibleBenefits {
+    if (!scoped) return giftUnits;
+    return showUserGifts ? userBenefits : ticketBenefits;
+  }
+
+  List<Gift> _giftsFor(List<String> ids) => [
+    for (final id in ids)
+      if (benefitById[id] != null) benefitById[id]!,
+  ];
+
   TicketFlowState copyWith({
     TicketPhase? phase,
     String? token,
     Ticket? ticket,
     Map<String, int>? gifts,
     Map<String, Gift>? catalogue,
+    Map<String, Gift>? benefitById,
+    List<String>? ticketBenefitIds,
+    List<String>? userBenefitIds,
+    bool? scoped,
+    bool? showUserGifts,
     List<ClaimedGift>? claimed,
     String? error,
     bool? busy,
@@ -82,6 +118,11 @@ class TicketFlowState {
     ticket: ticket ?? this.ticket,
     gifts: gifts ?? this.gifts,
     catalogue: catalogue ?? this.catalogue,
+    benefitById: benefitById ?? this.benefitById,
+    ticketBenefitIds: ticketBenefitIds ?? this.ticketBenefitIds,
+    userBenefitIds: userBenefitIds ?? this.userBenefitIds,
+    scoped: scoped ?? this.scoped,
+    showUserGifts: showUserGifts ?? this.showUserGifts,
     claimed: claimed ?? this.claimed,
     error: clearError ? null : (error ?? this.error),
     busy: busy ?? this.busy,
@@ -157,9 +198,18 @@ class TicketFlowController extends Notifier<TicketFlowState> {
         counts.remove(json['item_key'].toString());
         counts[gift.id] = 1;
       }
+      final ticketList = result.ticketBenefits ?? const <Gift>[];
+      final userList = result.userBenefits ?? const <Gift>[];
       state = state.copyWith(
         gifts: counts,
         catalogue: catalogue,
+        scoped: result.scoped,
+        benefitById: {
+          for (final gift in userList) gift.id: gift,
+          for (final gift in ticketList) gift.id: gift,
+        },
+        ticketBenefitIds: [for (final gift in ticketList) gift.id],
+        userBenefitIds: [for (final gift in userList) gift.id],
         phase: TicketPhase.gifts,
       );
     } on InvalidTicketException {
@@ -195,19 +245,48 @@ class TicketFlowController extends Notifier<TicketFlowState> {
       if (gift.isTreasure) {
         // Printing the LUD-03 is the handoff. The wallet still withdraws later,
         // so this must not burn the chest on the gift-quantity endpoint.
+        // The row reads as printed for this session and comes back, still
+        // READY, the next time the ticket is opened.
         final remaining = Map<String, int>.from(state.gifts)..remove(gift.id);
-        state = state.copyWith(gifts: remaining, clearClaiming: true);
+        state = state.copyWith(
+          gifts: remaining,
+          benefitById: _markPrinted(state.benefitById, gift),
+          clearClaiming: true,
+        );
         return gift;
       }
       final remaining = await ref
           .read(ticketingApiProvider)
           .consumeGift(ticket.token, gift.id);
-      state = state.copyWith(gifts: remaining, clearClaiming: true);
+      state = state.copyWith(
+        gifts: remaining,
+        benefitById: _markPrinted(state.benefitById, gift),
+        clearClaiming: true,
+      );
       return gift;
     } on AppException catch (error) {
       state = state.copyWith(clearClaiming: true, error: error.message);
       return null;
     }
+  }
+
+  void selectGiftScope(bool user) {
+    if (state.showUserGifts == user) return;
+    state = state.copyWith(showUserGifts: user);
+  }
+
+  void toggleGiftScope() => selectGiftScope(!state.showUserGifts);
+
+  static Map<String, Gift> _markPrinted(Map<String, Gift> gifts, Gift gift) {
+    final current = gifts[gift.id] ?? gift;
+    return {
+      ...gifts,
+      gift.id: current.copyWith(
+        printedLocally: true,
+        claimed: current.isTreasure ? current.claimed : true,
+        statusLabel: current.isTreasure ? 'Impreso' : 'Reclamado',
+      ),
+    };
   }
 
   /// Records a successful claim once its receipt has been dealt with.
