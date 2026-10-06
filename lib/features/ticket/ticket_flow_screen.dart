@@ -144,7 +144,7 @@ class TicketFlowScreen extends ConsumerWidget {
     final claimLine = claimed.isTreasure && sats != null
         ? 'RECLAMÁ ${NumberFormat.decimalPattern('es_AR').format(sats)} sats'
         : null;
-    final lnurl = claimed.isTreasure ? claimed.lnurl : null;
+    final lnurl = claimed.isTreasure ? claimed.lightningLnurl : null;
     final event = ticket?.eventName ?? '';
     final date = DateFormat('dd/MM/yy HH:mm', 'es_AR').format(claimedAt);
 

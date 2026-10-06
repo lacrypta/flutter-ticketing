@@ -2,8 +2,14 @@ package ar.lacrypta.lacrypta_ticketing
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.text.Layout
 import android.util.Log
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import com.google.zxing.qrcode.encoder.Encoder
 import com.zcs.sdk.DriverManager
 import com.zcs.sdk.Printer
 import com.zcs.sdk.SdkResult
@@ -153,8 +159,16 @@ class MainActivity : FlutterActivity() {
         // A Sats Treasure hands the attendee a scannable LUD-03, then the amount.
         if (lnurl != null) {
             p.setPrintLine(8)
-            // Full 58mm head (384 dots), same width as the gift artwork.
-            p.setPrintAppendQRCode(lnurl, 384, 384, Layout.Alignment.ALIGN_CENTER)
+            val payload = lightningDeeplink(lnurl)
+            val qr = runCatching { lud03Qr(payload) }.getOrElse { e ->
+                Log.w(TAG, "LUD-03 QR encode failed, falling back", e)
+                null
+            }
+            if (qr != null) {
+                p.setPrintAppendBitmap(qr, Layout.Alignment.ALIGN_CENTER)
+            } else {
+                p.setPrintAppendQRCode(payload, 384, 384, Layout.Alignment.ALIGN_CENTER)
+            }
             p.setPrintLine(10)
             str(v, "claimLine")?.let {
                 p.setPrintAppendString(it, fmt(34, Layout.Alignment.ALIGN_CENTER))
@@ -189,6 +203,57 @@ class MainActivity : FlutterActivity() {
 
     private fun str(m: Map<String, Any?>, k: String): String? =
         m[k]?.toString()?.takeIf { it.isNotEmpty() }
+
+    private fun lightningDeeplink(lnurl: String): String {
+        val value = lnurl.trim()
+        return if (value.startsWith("lightning:", ignoreCase = true)) value
+        else "lightning:$value"
+    }
+
+    /**
+     * LUD-03 QR sized for the 58mm head.
+     *
+     * [Printer.setPrintAppendQRCode] always encodes at error-correction H. A
+     * withdraw LNURL is long, so H jumps several versions and the modules
+     * shrink until a phone cannot read them off thermal paper. Level L is the
+     * smallest symbol that still scans, and each module is a whole number of
+     * printer dots so the head does not blur the edges.
+     */
+    private fun lud03Qr(payload: String, maxDots: Int = 384): Bitmap {
+        val code = Encoder.encode(
+            payload,
+            ErrorCorrectionLevel.L,
+            mapOf(EncodeHintType.CHARACTER_SET to "UTF-8"),
+        )
+        val matrix = code.matrix
+        val quiet = 4
+        val modules = matrix.width + quiet * 2
+        val modulePx = (maxDots / modules).coerceAtLeast(1)
+        val size = modules * modulePx
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)
+        val paint = Paint().apply {
+            color = Color.BLACK
+            style = Paint.Style.FILL
+            isAntiAlias = false
+        }
+        for (y in 0 until matrix.height) {
+            for (x in 0 until matrix.width) {
+                if (matrix.get(x, y).toInt() != 1) continue
+                val left = (x + quiet) * modulePx
+                val top = (y + quiet) * modulePx
+                canvas.drawRect(
+                    left.toFloat(),
+                    top.toFloat(),
+                    (left + modulePx).toFloat(),
+                    (top + modulePx).toFloat(),
+                    paint,
+                )
+            }
+        }
+        return bitmap
+    }
 
     companion object {
         private const val TAG = "LcPrinter"
