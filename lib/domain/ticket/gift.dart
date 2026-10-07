@@ -107,6 +107,15 @@ class Gift {
   /// Printed in this session. The chest stays READY on the server.
   final bool printedLocally;
 
+  /// Wallet deeplink for the LUD-03 QR. Phones open `lightning:`; a bare
+  /// bech32 string does not.
+  String? get lightningLnurl {
+    final value = lnurl?.trim();
+    if (value == null || value.isEmpty) return null;
+    if (value.toLowerCase().startsWith('lightning:')) return value;
+    return 'lightning:$value';
+  }
+
   bool get isTreasure =>
       kind == 'sats_treasure' ||
       (lnurl != null && lnurl!.isNotEmpty && (satsAmount ?? 0) > 0);
