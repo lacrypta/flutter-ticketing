@@ -72,3 +72,8 @@ class PrinterException extends AppException {
 class NfcException extends AppException {
   const NfcException([super.message = 'No se pudo leer la tarjeta']);
 }
+
+/// The prize service or the card's pay link refused the payout.
+class LnurlException extends AppException {
+  const LnurlException([super.message = 'No se pudo cobrar el premio']);
+}

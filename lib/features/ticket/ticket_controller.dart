@@ -289,6 +289,47 @@ class TicketFlowController extends Notifier<TicketFlowState> {
     };
   }
 
+  /// Blocks every other gift action while a card read or payout is in flight.
+  bool holdGift(String giftId) {
+    if (state.claimingGiftId != null) return false;
+    state = state.copyWith(claimingGiftId: giftId, clearError: true);
+    return true;
+  }
+
+  /// The card was unreadable or the payout failed. The prize stays available.
+  void releaseGift({String? error}) {
+    state = state.copyWith(
+      clearClaiming: true,
+      error: error,
+      clearError: error == null,
+    );
+  }
+
+  /// The LUD-03 withdraw returned `OK`. The prize service already paid the
+  /// card, so this must not also hit `/gifts/consume` — that endpoint burns a
+  /// quantity, and a treasure is not one.
+  void completeTreasureClaim(Gift gift) {
+    if (state.claimingGiftId != gift.id) return;
+    final remaining = Map<String, int>.from(state.gifts)..remove(gift.id);
+    state = state.copyWith(
+      gifts: remaining,
+      benefitById: _markPaid(state.benefitById, gift),
+      clearClaiming: true,
+    );
+  }
+
+  static Map<String, Gift> _markPaid(Map<String, Gift> gifts, Gift gift) {
+    final current = gifts[gift.id] ?? gift;
+    return {
+      ...gifts,
+      gift.id: current.copyWith(
+        claimed: true,
+        statusLabel: 'Reclamado',
+        clearLnurl: true,
+      ),
+    };
+  }
+
   /// Records a successful claim once its receipt has been dealt with.
   void recordClaim(ClaimedGift claim) {
     state = state.copyWith(claimed: [claim, ...state.claimed]);

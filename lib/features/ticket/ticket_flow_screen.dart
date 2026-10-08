@@ -21,6 +21,7 @@ import '../../ui/components/lc_surface.dart';
 import '../../ui/components/lc_tabular.dart';
 import '../history/history_controller.dart';
 import 'ticket_controller.dart';
+import 'treasure_nfc_panel.dart';
 import 'voucher_preview.dart';
 
 /// One route, many phases — the flow is a state machine, not a stack, so
@@ -520,8 +521,14 @@ class _GiftsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final units = state.visibleBenefits;
-    final gifts = [for (final gift in units) if (!gift.isTreasure) gift];
-    final treasures = [for (final gift in units) if (gift.isTreasure) gift];
+    final gifts = [
+      for (final gift in units)
+        if (!gift.isTreasure) gift,
+    ];
+    final treasures = [
+      for (final gift in units)
+        if (gift.isTreasure) gift,
+    ];
     final userView = state.showUserGifts;
 
     return Column(
@@ -534,6 +541,7 @@ class _GiftsView extends StatelessWidget {
         const SizedBox(height: LcSpace.md),
         _BenefitTabs(userView: userView, onSelectScope: onSelectScope),
         const SizedBox(height: LcSpace.lg),
+        const TreasureNfcPanel(),
 
         if (state.error != null) ...[
           _ErrorNote(state.error!),
@@ -722,12 +730,22 @@ class _GiftRow extends StatelessWidget {
               ),
               if (busy)
                 const LcSpinner(size: 22, color: LcColors.onAccent)
-              else
+              else ...[
+                if (gift.isTreasure)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 10),
+                    child: Icon(
+                      LucideIcons.nfc,
+                      size: 22,
+                      color: LcColors.onAccent,
+                    ),
+                  ),
                 const Icon(
                   LucideIcons.printer,
                   size: 22,
                   color: LcColors.onAccent,
                 ),
+              ],
             ],
           ),
         ),

@@ -27,7 +27,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NFCReaderUsageDescription</key>
-	<string>Se lee la tarjeta NFC para identificar al asistente.</string>
+	<string>Se lee la tarjeta NFC para cobrar premios en sats.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Se conecta a la impresora térmica para imprimir comprobantes.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
