@@ -46,6 +46,31 @@ const List<String> _uriPrefixes = <String>[
   'urn:nfc:',
 ];
 
+/// Every record as text, so a failed tap can show what was actually on the tag.
+String describeNdef(NdefMessage? message) {
+  if (message == null || message.records.isEmpty) return '(vacía)';
+  final lines = <String>[];
+  for (var i = 0; i < message.records.length; i++) {
+    final record = message.records[i];
+    final text = _recordText(record);
+    lines.add(
+      'registro $i · ${_typeName(record.typeNameFormat)}'
+      '${text == null || text.isEmpty ? '' : '\n$text'}',
+    );
+  }
+  return lines.join('\n\n');
+}
+
+String _typeName(TypeNameFormat format) => switch (format) {
+  TypeNameFormat.empty => 'empty',
+  TypeNameFormat.wellKnown => 'well-known',
+  TypeNameFormat.media => 'media',
+  TypeNameFormat.absoluteUri => 'uri',
+  TypeNameFormat.external => 'external',
+  TypeNameFormat.unknown => 'unknown',
+  TypeNameFormat.unchanged => 'unchanged',
+};
+
 /// The string a LaWallet card left on the tag: an LNURL, a URL, or the
 /// LUD-19 JSON itself.
 String cardPayloadFromNdef(NdefMessage? message) {

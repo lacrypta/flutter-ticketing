@@ -7,16 +7,15 @@ import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 
 import '../../core/error/app_exception.dart';
 import 'ndef_payload.dart';
+import 'nfc_foreground.dart';
 
-/// The operator dismissed the system sheet. Not a failed card.
-class NfcReadCancelled extends NfcException {
-  const NfcReadCancelled() : super('Lectura cancelada');
-}
+export '../../core/error/app_exception.dart' show NfcReadCancelled;
 
 /// One tap, one NDEF payload.
 ///
-/// Android keeps a reader session until [cancel]. iOS presents the system
-/// sheet for this single read — Core NFC will not listen in the background.
+/// On Android the app already holds reader mode ([NfcForeground]), so this
+/// only waits for the next card and never disables the session. iOS presents
+/// the system sheet for this single read — Core NFC will not listen otherwise.
 class NfcCardReader {
   Completer<String>? _pending;
 
@@ -34,6 +33,9 @@ class NfcCardReader {
   }
 
   Future<String> readOnce({required String prompt}) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return NfcForeground.instance.waitForCard();
+    }
     final current = _pending;
     if (current != null && !current.isCompleted) {
       return Future<String>.error(
@@ -47,6 +49,10 @@ class NfcCardReader {
   }
 
   Future<void> cancel() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      NfcForeground.instance.cancelWait();
+      return;
+    }
     final pending = _pending;
     _pending = null;
     if (pending != null && !pending.isCompleted) {

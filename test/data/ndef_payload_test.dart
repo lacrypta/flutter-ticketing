@@ -44,6 +44,25 @@ void main() {
     expect(cardPayloadFromNdef(message), 'lnurl1dp68gurn8ghj7');
   });
 
+  test('a failed read can still show the record text', () {
+    final message = NdefMessage(
+      records: [
+        NdefRecord(
+          typeNameFormat: TypeNameFormat.wellKnown,
+          type: Uint8List.fromList([0x54]),
+          identifier: Uint8List(0),
+          payload: Uint8List.fromList([
+            0x02,
+            ...utf8.encode('en'),
+            ...utf8.encode('not-a-link'),
+          ]),
+        ),
+      ],
+    );
+
+    expect(describeNdef(message), contains('not-a-link'));
+  });
+
   test('an empty tag is a failed read, not a payment', () {
     expect(
       () => cardPayloadFromNdef(const NdefMessage(records: [])),

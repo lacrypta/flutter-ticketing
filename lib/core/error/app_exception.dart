@@ -70,10 +70,32 @@ class PrinterException extends AppException {
 }
 
 class NfcException extends AppException {
-  const NfcException([super.message = 'No se pudo leer la tarjeta']);
+  const NfcException([
+    super.message = 'No se pudo leer la tarjeta',
+    this.detail,
+  ]);
+
+  /// Raw tag contents, when the read itself failed.
+  final String? detail;
+}
+
+/// The operator dismissed the system sheet, or the app left the foreground
+/// before a card arrived. Not a failed card.
+class NfcReadCancelled extends NfcException {
+  const NfcReadCancelled() : super('Lectura cancelada');
 }
 
 /// The prize service or the card's pay link refused the payout.
 class LnurlException extends AppException {
-  const LnurlException([super.message = 'No se pudo cobrar el premio']);
+  const LnurlException([
+    super.message = 'No se pudo cobrar el premio',
+    this.response,
+    this.link,
+  ]);
+
+  /// Pretty-printed body of the request that failed.
+  final String? response;
+
+  /// The URL taken from `lnurlw://`, when the card was parsed.
+  final String? link;
 }

@@ -7,27 +7,60 @@ import '../../core/error/app_exception.dart';
 
 export '../../core/error/app_exception.dart' show LnurlException;
 
-/// Turns an `lnurl1…` string, a `lightning:` link, a lightning address or a
-/// raw URL into the HTTPS endpoint a wallet would GET.
-Uri decodeLnurl(String source) {
-  var value = source.trim();
-  if (value.toLowerCase().startsWith('lightning:')) {
-    value = value.substring('lightning:'.length).trim();
+/// Segwit addresses cap bech32 at 90 characters. LNURL does not — a withdraw
+/// link is a URL, and a real one is longer than that. The package default
+/// rejects it as `TooLong`, which we were reporting as a missing pay link.
+const int _maxBech32Length = 4096;
+
+/// A card writes `lnurlw://{link}`. `{link}` is the LUD-03 endpoint: a full
+/// `https://` URL, or a host and path fetched over HTTPS.
+Uri lnurlwUri(String source) {
+  final value = source.trim();
+  const prefix = 'lnurlw://';
+  if (!value.toLowerCase().startsWith(prefix)) {
+    throw const LnurlException('Se esperaba lnurlw://{link}');
   }
+  var link = value.substring(prefix.length).trim();
+  if (link.isEmpty) {
+    throw const LnurlException('Se esperaba lnurlw://{link}');
+  }
+  if (link.toLowerCase().startsWith('lnurl1')) return decodeLnurl(link);
+  if (!link.contains('://')) link = 'https://$link';
+  final uri = Uri.tryParse(link);
+  if (uri == null ||
+      (uri.scheme != 'https' && uri.scheme != 'http') ||
+      uri.host.isEmpty) {
+    throw LnurlException('El link de la tarjeta no es una URL', value);
+  }
+  return uri;
+}
+
+/// Turns an `lnurlp://` pay link, an `lnurl1…` string, a `lightning:` link, a
+/// lightning address or a raw URL into the HTTPS endpoint a wallet would GET.
+///
+/// `lnurlp://{link}` is a LUD-06 endpoint. `{link}` is fetched as `https://`
+/// unless it is already a URL or a bech32 LNURL.
+Uri decodeLnurl(String source) {
+  var value = _unwrapPayLink(source.trim());
 
   final lower = value.toLowerCase();
   if (lower.startsWith('lnurl1')) {
     try {
-      final decoded = const Bech32Codec().decode(lower);
+      final decoded = const Bech32Codec().decode(lower, _maxBech32Length);
       if (decoded.hrp != 'lnurl') {
-        throw const LnurlException('La tarjeta no tiene un link de cobro');
+        throw LnurlException('No se pudo leer el LNURL', value);
       }
       final bytes = _convertBits(decoded.data, 5, 8, pad: false);
       value = utf8.decode(bytes);
+      if (value.toLowerCase().startsWith('lnurlp://') ||
+          value.toLowerCase().startsWith('lnurlw://') ||
+          value.toLowerCase().startsWith('lightning:')) {
+        return decodeLnurl(value);
+      }
     } on LnurlException {
       rethrow;
-    } catch (_) {
-      throw const LnurlException('La tarjeta no tiene un link de cobro');
+    } catch (error) {
+      throw LnurlException('No se pudo leer el LNURL: $error', value);
     }
   } else if (value.contains('@') && !value.contains('://')) {
     final parts = value.split('@');
@@ -38,16 +71,46 @@ Uri decodeLnurl(String source) {
 
   final uri = Uri.tryParse(value);
   if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) {
-    throw const LnurlException('La tarjeta no tiene un link de cobro');
+    throw LnurlException('No se pudo leer el LNURL', value);
   }
   return uri;
+}
+
+/// Strips `lightning:` and `lnurlp://` until the remainder is a URL, a bech32
+/// LNURL, or a lightning address. A bare host is fetched over HTTPS.
+String _unwrapPayLink(String value) {
+  while (true) {
+    final lower = value.toLowerCase();
+    if (lower.startsWith('lightning:')) {
+      value = value.substring('lightning:'.length).trim();
+      continue;
+    }
+    if (lower.startsWith('lnurlp://')) {
+      value = value.substring('lnurlp://'.length).trim();
+      continue;
+    }
+    break;
+  }
+  if (value.isEmpty) {
+    throw const LnurlException('La tarjeta no tiene un link de cobro');
+  }
+  final lower = value.toLowerCase();
+  if (!value.contains('://') &&
+      !lower.startsWith('lnurl1') &&
+      !value.contains('@')) {
+    if (!value.contains('.')) {
+      throw const LnurlException('La tarjeta no tiene un link de cobro');
+    }
+    value = 'https://$value';
+  }
+  return value;
 }
 
 /// Bech32 `lnurl1…` for a URL. Used by tests and by anything that has to
 /// hand a withdraw link back as a scannable string.
 String encodeLnurl(String url) {
   final data = _convertBits(utf8.encode(url), 8, 5, pad: true);
-  return const Bech32Codec().encode(Bech32('lnurl', data));
+  return const Bech32Codec().encode(Bech32('lnurl', data), _maxBech32Length);
 }
 
 /// LUD-19: an LNURL-withdraw response may carry a `payLink`, a raw URL
@@ -114,34 +177,88 @@ class DioLnurlTransport implements LnurlTransport {
       return _asMap(response.data);
     } on DioException catch (error) {
       final body = error.response?.data;
+      final printed = formatLnurlBody(body);
       if (body is Map) {
         final json = _asMap(body);
         final reason = json['reason'];
-        if (reason is String && reason.isNotEmpty) throw LnurlException(reason);
+        if (reason is String && reason.isNotEmpty) {
+          throw LnurlException(reason, printed);
+        }
       }
-      throw const LnurlException('Sin conexión con el premio');
+      throw LnurlException(
+        'Sin conexión con el premio',
+        printed.isEmpty ? null : printed,
+      );
     }
   }
 }
 
-/// Reads a tapped card's payload and returns the LUD-19 `payLink`.
+/// LUD-03 body returned by the URL inside `lnurlw://`.
+class CardLud03 {
+  const CardLud03({
+    required this.url,
+    required this.payLink,
+    required this.json,
+  });
+
+  final String url;
+  final String payLink;
+  final Map<String, dynamic> json;
+}
+
+/// Reads `lnurlw://{link}`, fetches `{link}`, and requires a LUD-03 body
+/// that carries `payLink`.
 class CardPayLink {
   const CardPayLink(this._transport);
 
   final LnurlTransport _transport;
 
-  Future<String> resolve(String payload) async {
-    final trimmed = payload.trim();
-    if (trimmed.startsWith('{')) {
-      final decoded = jsonDecode(trimmed);
-      if (decoded is! Map) {
-        throw const LnurlException('La tarjeta no tiene un link de cobro');
-      }
-      return payLinkFrom(_asMap(decoded));
+  Future<CardLud03> resolve(String payload) async {
+    final uri = lnurlwUri(payload);
+    late final Map<String, dynamic> json;
+    try {
+      json = await _transport.get(uri);
+    } on LnurlException catch (error) {
+      throw LnurlException(error.message, error.response, uri.toString());
     }
-    final json = await _transport.get(decodeLnurl(trimmed));
-    return payLinkFrom(json);
+    try {
+      return CardLud03(
+        url: uri.toString(),
+        payLink: _lud03PayLink(json),
+        json: json,
+      );
+    } on LnurlException catch (error) {
+      throw LnurlException(
+        error.message,
+        error.response ?? formatLnurlBody(json),
+        uri.toString(),
+      );
+    }
   }
+}
+
+String _lud03PayLink(Map<String, dynamic> json) {
+  final status = json['status'];
+  if (status is String && status.toUpperCase() == 'ERROR') {
+    final reason = json['reason'];
+    throw LnurlException(
+      reason is String && reason.isNotEmpty
+          ? reason
+          : 'La tarjeta rechazó la lectura',
+      formatLnurlBody(json),
+    );
+  }
+  if (json['tag'] != 'withdrawRequest') {
+    throw LnurlException('La respuesta no es un LUD-03', formatLnurlBody(json));
+  }
+  final payLink = json['payLink'];
+  if (payLink is! String || payLink.trim().isEmpty) {
+    throw LnurlException(
+      'La tarjeta no tiene un link de cobro',
+      formatLnurlBody(json),
+    );
+  }
+  return payLink.trim();
 }
 
 /// Pays a treasure's LUD-03 withdraw into a card's pay link.
@@ -165,14 +282,20 @@ class LnurlPayer {
     final callback = _string(withdraw, 'callback');
     final k1 = _string(withdraw, 'k1');
     if (callback == null || k1 == null) {
-      throw const LnurlException('Este premio no se puede cobrar');
+      throw LnurlException(
+        'Este premio no se puede cobrar',
+        formatLnurlBody(withdraw),
+      );
     }
 
     final pay = await _transport.get(decodeLnurl(payLink));
     _rejectError(pay, 'La tarjeta no acepta el cobro');
     final payCallback = _string(pay, 'callback');
     if (payCallback == null) {
-      throw const LnurlException('La tarjeta no acepta el cobro');
+      throw LnurlException(
+        'La tarjeta no acepta el cobro',
+        formatLnurlBody(pay),
+      );
     }
 
     final msats = withdrawAmountMsats(
@@ -188,7 +311,12 @@ class LnurlPayer {
     );
     _rejectError(invoice, 'No se pudo generar el cobro');
     final pr = _string(invoice, 'pr');
-    if (pr == null) throw const LnurlException('No se pudo generar el cobro');
+    if (pr == null) {
+      throw LnurlException(
+        'No se pudo generar el cobro',
+        formatLnurlBody(invoice),
+      );
+    }
 
     final result = await _transport.get(
       _withQuery(callback, {'k1': k1, 'pr': pr}),
@@ -196,7 +324,10 @@ class LnurlPayer {
     final status = result['status'];
     if (status is String && status.toUpperCase() == 'OK') return;
     _rejectError(result, 'No se pudo acreditar el premio');
-    throw const LnurlException('No se pudo acreditar el premio');
+    throw LnurlException(
+      'No se pudo acreditar el premio',
+      formatLnurlBody(result),
+    );
   }
 }
 
@@ -206,7 +337,22 @@ void _rejectError(Map<String, dynamic> json, String fallback) {
   final reason = json['reason'];
   throw LnurlException(
     reason is String && reason.isNotEmpty ? reason : fallback,
+    formatLnurlBody(json),
   );
+}
+
+/// Indented JSON when [data] is an object, otherwise its text.
+String formatLnurlBody(Object? data) {
+  if (data == null) return '';
+  if (data is Map || data is List) {
+    try {
+      return const JsonEncoder.withIndent('  ').convert(data);
+    } catch (_) {
+      return data.toString();
+    }
+  }
+  final text = data.toString();
+  return text == 'null' ? '' : text;
 }
 
 String? _string(Map<String, dynamic> json, String key) {

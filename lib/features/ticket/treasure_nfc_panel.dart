@@ -12,6 +12,7 @@ import '../../core/error/app_exception.dart';
 import '../../core/theme/lc_colors.dart';
 import '../../core/theme/lc_metrics.dart';
 import '../../core/theme/lc_typography.dart';
+import '../../data/lnurl/lnurl.dart';
 import '../../data/lnurl/lnurl_providers.dart';
 import '../../data/nfc/nfc_card_reader.dart';
 import '../../domain/ticket/gift.dart';
@@ -39,6 +40,9 @@ class _TreasureNfcPanelState extends ConsumerState<TreasureNfcPanel>
   _NfcPhase _phase = _NfcPhase.idle;
   NfcAvailability _availability = NfcAvailability.unsupported;
   String? _message;
+  String? _cardData;
+  String? _link;
+  String? _response;
   int? _sats;
   String? _label;
   bool _session = false;
@@ -123,7 +127,7 @@ class _TreasureNfcPanelState extends ConsumerState<TreasureNfcPanel>
         setState(() => _message = null);
       }
     } on NfcException catch (error) {
-      _showError(error.message);
+      _showError(error.message, card: error.detail);
     } finally {
       _session = false;
     }
@@ -152,8 +156,9 @@ class _TreasureNfcPanelState extends ConsumerState<TreasureNfcPanel>
     });
     unawaited(HapticFeedback.selectionClick());
 
+    CardLud03? card;
     try {
-      final payLink = await resolve(raw);
+      card = await resolve(raw);
       if (!mounted) {
         controller.releaseGift();
         _holding = false;
@@ -163,7 +168,7 @@ class _TreasureNfcPanelState extends ConsumerState<TreasureNfcPanel>
       _payoutStarted = true;
       await payer.payWithdrawTo(
         withdrawLnurl: gift.lnurl!,
-        payLink: payLink,
+        payLink: card.payLink,
         sats: gift.satsAmount,
       );
       controller.completeTreasureClaim(gift);
@@ -185,20 +190,41 @@ class _TreasureNfcPanelState extends ConsumerState<TreasureNfcPanel>
       controller.releaseGift();
       _holding = false;
       _payoutStarted = false;
-      _showError(error.message);
+      _showError(
+        error.message,
+        card: raw,
+        link: card?.url ?? (error is LnurlException ? error.link : null),
+        response: _debugBody(
+          card?.json,
+          error is LnurlException ? error.response : null,
+        ),
+      );
     } catch (_) {
       controller.releaseGift();
       _holding = false;
       _payoutStarted = false;
-      _showError('No se pudo cobrar el premio');
+      _showError(
+        'No se pudo cobrar el premio',
+        card: raw,
+        link: card?.url,
+        response: card == null ? null : formatLnurlBody(card.json),
+      );
     }
   }
 
-  void _showError(String message) {
+  void _showError(
+    String message, {
+    String? card,
+    String? link,
+    String? response,
+  }) {
     if (!mounted) return;
     setState(() {
       _phase = _NfcPhase.error;
       _message = message;
+      _cardData = card;
+      _link = link;
+      _response = response;
     });
   }
 
@@ -207,6 +233,9 @@ class _TreasureNfcPanelState extends ConsumerState<TreasureNfcPanel>
     setState(() {
       _phase = _NfcPhase.idle;
       _message = null;
+      _cardData = null;
+      _link = null;
+      _response = null;
     });
     if (_availability != NfcAvailability.enabled) {
       unawaited(_arm());
@@ -251,6 +280,9 @@ class _TreasureNfcPanelState extends ConsumerState<TreasureNfcPanel>
       label: label,
       waiting: waiting,
       message: _message,
+      cardData: _cardData,
+      link: _link,
+      response: _response,
       ios: _ios,
       onRetry: _retry,
     );
@@ -275,6 +307,9 @@ class _NfcCard extends StatelessWidget {
     required this.label,
     required this.waiting,
     required this.message,
+    required this.cardData,
+    required this.link,
+    required this.response,
     required this.ios,
     required this.onRetry,
   });
@@ -284,6 +319,9 @@ class _NfcCard extends StatelessWidget {
   final String? label;
   final int waiting;
   final String? message;
+  final String? cardData;
+  final String? link;
+  final String? response;
   final bool ios;
   final VoidCallback onRetry;
 
@@ -304,11 +342,37 @@ class _NfcCard extends StatelessWidget {
         borderRadius: LcRadius.cardAll,
         border: Border.all(color: color.withValues(alpha: live ? 0.46 : 0.28)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _NfcHalo(phase: phase),
-          const SizedBox(width: LcSpace.md),
-          Expanded(child: _copy(color)),
+          Row(
+            children: [
+              _NfcHalo(phase: phase),
+              const SizedBox(width: LcSpace.md),
+              Expanded(child: _copy(color)),
+            ],
+          ),
+          if (phase == _NfcPhase.error &&
+              (cardData != null || link != null || response != null)) ...[
+            if (cardData != null && cardData!.isNotEmpty) ...[
+              const SizedBox(height: LcSpace.md),
+              const LcEyebrow('tarjeta'),
+              const SizedBox(height: 4),
+              _DebugText(cardData!),
+            ],
+            if (link != null && link!.isNotEmpty) ...[
+              const SizedBox(height: LcSpace.md),
+              const LcEyebrow('link'),
+              const SizedBox(height: 4),
+              _DebugText(link!),
+            ],
+            if (response != null && response!.isNotEmpty) ...[
+              const SizedBox(height: LcSpace.md),
+              const LcEyebrow('respuesta'),
+              const SizedBox(height: 4),
+              _DebugText(response!),
+            ],
+          ],
         ],
       ),
     );
@@ -384,6 +448,35 @@ class _NfcCard extends StatelessWidget {
 }
 
 String _sats(int amount) => NumberFormat.decimalPattern('es_AR').format(amount);
+
+String? _debugBody(Map<String, dynamic>? lud03, String? errorBody) {
+  final printed = lud03 == null ? null : formatLnurlBody(lud03);
+  if (printed == null || printed.isEmpty) return errorBody;
+  if (errorBody == null || errorBody.isEmpty || errorBody == printed) {
+    return printed;
+  }
+  return '$printed\n\n$errorBody';
+}
+
+class _DebugText extends StatelessWidget {
+  const _DebugText(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return SelectableText(
+      text,
+      style: const TextStyle(
+        fontFamily: 'monospace',
+        fontFamilyFallback: ['Menlo', 'Roboto Mono', 'Courier'],
+        fontSize: 13,
+        height: 1.35,
+        color: LcColors.textDim,
+      ),
+    );
+  }
+}
 
 class _NfcHalo extends StatefulWidget {
   const _NfcHalo({required this.phase});

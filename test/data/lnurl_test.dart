@@ -17,6 +17,56 @@ void main() {
     test('rejects a string that is not a payment link', () {
       expect(() => decodeLnurl('nope'), throwsA(isA<LnurlException>()));
     });
+
+    test('lnurlp:// is fetched as https', () {
+      expect(
+        decodeLnurl(
+          'lnurlp://wallet.example/.well-known/lnurlp/ada',
+        ).toString(),
+        pay,
+      );
+    });
+
+    test('lnurlp:// accepts a bech32 LNURL', () {
+      expect(decodeLnurl('lnurlp://${encodeLnurl(pay)}').toString(), pay);
+    });
+
+    test('a bech32 longer than 90 characters still decodes', () {
+      final url = 'https://prize.example/lnurl/${'chest-' * 20}';
+      final encoded = encodeLnurl(url);
+      expect(encoded.length, greaterThan(90));
+      expect(decodeLnurl(encoded).toString(), url);
+      expect(decodeLnurl('lnurlp://$encoded').toString(), url);
+    });
+  });
+
+  group('lnurlw://', () {
+    test('a host without a scheme is fetched over https', () {
+      expect(
+        lnurlwUri('lnurlw://card.example/w/1').toString(),
+        'https://card.example/w/1',
+      );
+    });
+
+    test('a full URL after the scheme is fetched as written', () {
+      expect(
+        lnurlwUri('LNURLW://https://card.example/w/1').toString(),
+        'https://card.example/w/1',
+      );
+    });
+
+    test('anything else is refused', () {
+      expect(
+        () => lnurlwUri('https://card.example/w/1'),
+        throwsA(
+          isA<LnurlException>().having(
+            (error) => error.message,
+            'message',
+            'Se esperaba lnurlw://{link}',
+          ),
+        ),
+      );
+    });
   });
 
   group('LUD-19 payLink', () {
@@ -73,7 +123,7 @@ void main() {
 
         await LnurlPayer(transport).payWithdrawTo(
           withdrawLnurl: encodeLnurl(prize),
-          payLink: pay,
+          payLink: 'lnurlp://wallet.example/.well-known/lnurlp/ada',
           sats: 210,
         );
 
@@ -109,15 +159,52 @@ void main() {
       },
     );
 
-    test(
-      'a card JSON payload is enough when it already includes payLink',
-      () async {
-        final link = await CardPayLink(
-          _Script(const {}),
-        ).resolve('{"tag":"withdrawRequest","payLink":"$pay"}');
-        expect(link, pay);
-      },
-    );
+    test('fetches the link and reads payLink off the LUD-03', () async {
+      final transport = _Script({
+        'https://card.example/w/1': {
+          'tag': 'withdrawRequest',
+          'callback': 'https://card.example/cb',
+          'k1': 'abc',
+          'minWithdrawable': 0,
+          'maxWithdrawable': 0,
+          'payLink': pay,
+        },
+      });
+
+      final card = await CardPayLink(
+        transport,
+      ).resolve('lnurlw://card.example/w/1');
+
+      expect(card.url, 'https://card.example/w/1');
+      expect(card.payLink, pay);
+      expect(card.json['tag'], 'withdrawRequest');
+      expect(transport.calls, ['https://card.example/w/1']);
+    });
+
+    test('a LUD-03 without payLink keeps the json for the screen', () {
+      final transport = _Script({
+        'https://card.example/w/1': {'tag': 'withdrawRequest', 'k1': 'abc'},
+      });
+
+      expect(
+        () =>
+            CardPayLink(transport).resolve('lnurlw://https://card.example/w/1'),
+        throwsA(
+          isA<LnurlException>()
+              .having(
+                (error) => error.message,
+                'message',
+                'La tarjeta no tiene un link de cobro',
+              )
+              .having((error) => error.link, 'link', 'https://card.example/w/1')
+              .having(
+                (error) => error.response,
+                'response',
+                contains('"tag": "withdrawRequest"'),
+              ),
+        ),
+      );
+    });
   });
 }
 

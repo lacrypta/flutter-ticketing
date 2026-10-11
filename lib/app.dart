@@ -6,6 +6,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/lc_theme.dart';
 import 'data/market/market_cache.dart';
 import 'data/market/market_quote.dart';
+import 'data/nfc/nfc_capture.dart';
 
 class LacryptaTicketingApp extends ConsumerWidget {
   const LacryptaTicketingApp({super.key});
@@ -37,14 +38,16 @@ class LacryptaTicketingApp extends ConsumerWidget {
         // capped instead of letting the layout break — while still honouring
         // a user who has enlarged text.
         final media = MediaQuery.of(context);
-        return MediaQuery(
-          data: media.copyWith(
-            textScaler: media.textScaler.clamp(
-              minScaleFactor: 0.9,
-              maxScaleFactor: 1.3,
+        return NfcCapture(
+          child: MediaQuery(
+            data: media.copyWith(
+              textScaler: media.textScaler.clamp(
+                minScaleFactor: 0.9,
+                maxScaleFactor: 1.3,
+              ),
             ),
+            child: child ?? const SizedBox.shrink(),
           ),
-          child: child ?? const SizedBox.shrink(),
         );
       },
     );
