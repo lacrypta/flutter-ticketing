@@ -304,6 +304,12 @@ stale check-in screen for an entrada that has already been claimed.
   `analyzer ^13`, which cannot co-resolve with the analyzer `flutter_riverpod`
   drags in through `test`.
 - `sqlite3_flutter_libs` is EOL; `package:sqlite3` v3 bundles the natives.
+- **CI runs the Dart checks only** — `flutter analyze` and `flutter test` on
+  every PR and every push to `main`, pinned to Flutter 3.44.4
+  ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). There is no APK
+  job: the ZCS jars the Android build needs are not redistributable, so that
+  build stays on a machine that has them. See
+  [The proprietary bits](#the-proprietary-bits).
 
 ---
 

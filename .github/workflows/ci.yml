@@ -1,0 +1,49 @@
+name: CI
+
+# Dart-level checks only — there is deliberately no Android/APK job. The ZCS
+# SmartPos SDK jars (android/app/libs/) and native libs
+# (android/app/src/main/jniLibs/) are proprietary, not redistributable and
+# gitignored, and MainActivity.kt imports com.zcs.sdk unconditionally, so a
+# Kotlin compile cannot succeed on a clean clone. See "The proprietary bits"
+# in README.md. Android builds stay local, on a machine that has the SDK.
+#
+# `dart format --set-exit-if-changed` is also absent on purpose: the tree does
+# not currently satisfy it (lib/domain/ticket/gift.dart). Reformat first, then
+# add the step.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Supersede in-flight PR runs; let every push to main keep its own status.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # pubspec only sets a floor (flutter >=3.29.0), so pin the exact release the
+  # project is developed against instead of following `stable` wherever it goes.
+  FLUTTER_VERSION: 3.44.4
+
+jobs:
+  dart:
+    name: analyze + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+          pub-cache: true
+          pub-cache-key: flutter-pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}
+
+      - run: flutter pub get
+
+      - run: flutter analyze
+
+      - run: flutter test
