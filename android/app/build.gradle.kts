@@ -85,7 +85,10 @@ kotlin {
 dependencies {
     // ZCS SmartPos SDK — the built-in thermal printer on Ciontek terminals
     // (Z92, CS30Pro). Proprietary and not redistributable, so the jars are
-    // gitignored; see README. Absent jars = no printer, app still runs.
+    // gitignored — and required, not optional: MainActivity.kt imports
+    // com.zcs.sdk and com.google.zxing unconditionally, so an empty libs/
+    // fails :app:compileDebugKotlin outright rather than building a
+    // printer-less app. See README → Printing → The proprietary bits.
     implementation(fileTree("libs") { include("*.jar") })
 }
 
