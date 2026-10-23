@@ -50,9 +50,11 @@ class Gift {
     return Gift(
       id: explicitId != null && explicitId.isNotEmpty
           ? explicitId
-          : (kind == 'sats_treasure' && claimCode != null && claimCode.isNotEmpty
-              ? claimCode
-              : key),
+          : (kind == 'sats_treasure' &&
+                    claimCode != null &&
+                    claimCode.isNotEmpty
+                ? claimCode
+                : key),
       label: (name == null || name.isEmpty) ? key : name,
       imageUrl: json['image_url']?.toString(),
       lnurl: json['lnurl']?.toString(),
@@ -127,7 +129,9 @@ class Gift {
 
   String get detail {
     if (!isTreasure) return '';
-    if (quantityLabel != null && quantityLabel!.isNotEmpty) return quantityLabel!;
+    if (quantityLabel != null && quantityLabel!.isNotEmpty) {
+      return quantityLabel!;
+    }
     if (satsAmount != null && satsAmount! > 0) return '$satsAmount sats';
     return '';
   }

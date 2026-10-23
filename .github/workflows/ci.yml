@@ -6,10 +6,6 @@ name: CI
 # gitignored, and MainActivity.kt imports com.zcs.sdk unconditionally, so a
 # Kotlin compile cannot succeed on a clean clone. See "The proprietary bits"
 # in README.md. Android builds stay local, on a machine that has the SDK.
-#
-# `dart format --set-exit-if-changed` is also absent on purpose: the tree does
-# not currently satisfy it (lib/domain/ticket/gift.dart). Reformat first, then
-# add the step.
 
 on:
   pull_request:
@@ -43,6 +39,12 @@ jobs:
           pub-cache-key: flutter-pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}
 
       - run: flutter pub get
+
+      # Note: the formatter and `curly_braces_in_flow_control_structures`
+      # disagree about a single-statement `if` whose body is wrapped onto its
+      # own line — the formatter wants the wrap, the lint wants braces. Write
+      # the braces and both are satisfied.
+      - run: dart format --output=none --set-exit-if-changed .
 
       - run: flutter analyze
 
