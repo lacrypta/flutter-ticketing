@@ -50,6 +50,9 @@ flutter pub get
 flutter run
 ```
 
+An Android build needs the proprietary ZCS jars dropped in first — see
+[The proprietary bits](#the-proprietary-bits).
+
 Point it at another backend without touching source:
 
 ```bash
@@ -224,17 +227,22 @@ Check paper before doors: **Ajustes → Impresora → Imprimir prueba**.
 ### The proprietary bits
 
 The ZCS SDK is not redistributable, so **both** halves are gitignored and must
-be copied in by hand before an Android build that needs printing:
+be copied in by hand before **any** Android build — not only one that prints:
 
 ```
 android/app/libs/                 SmartPos_*.jar, zxing-core-*.jar
 android/app/src/main/jniLibs/     armeabi-v7a|arm64-v8a/libSmartPosJni.so, libEmvCoreJni.so
 ```
 
-The jar alone is not enough — without the `.so` the SDK throws
-`dlopen failed: library "libSmartPosJni.so" not found` and the app reports "sin
-impresora". Missing files are not fatal: check-in works, vouchers just don't
-print.
+**The jars are a hard build requirement.** `MainActivity.kt` imports
+`com.zcs.sdk` and `com.google.zxing` unconditionally, so with `libs/` empty the
+Kotlin compile fails with a wall of `Unresolved reference 'setPrintLine'` /
+`'Encoder'`. Every fresh clone and every new git worktree starts without them.
+
+The `.so` files are the softer half: jars in place but `jniLibs/` missing still
+compiles and runs — the SDK throws `dlopen failed: library "libSmartPosJni.so"
+not found` and the app reports "sin impresora". Check-in works, vouchers just
+don't print.
 
 `proguard-rules.pro` keeps `com.zcs.**`. Without it the printer works in debug
 and dies in release only.

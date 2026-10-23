@@ -50,7 +50,7 @@ android/key.properties
 *.keystore
 
 # Proprietary ZCS SmartPos SDK jars (redistribution not permitted).
-# See docs/PRINTING.md for how to obtain and place these.
+# Required to compile, not optional — see README → Printing → the proprietary bits.
 android/app/libs/*.jar
 
 # Local env overrides
