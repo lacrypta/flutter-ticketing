@@ -58,11 +58,17 @@ class PrinterChannel {
     }
   }
 
+  /// The roll ran out, either before the slip started or partway through it.
+  /// The SDK drops the rest of the job either way, so the cure is printing the
+  /// whole voucher again once a new roll is in.
+  static const paperOut = 'Sin papel';
+  static const overheated = 'Impresora sobrecalentada';
+
   /// ZCS SdkResult codes. 0 is success.
   static String? _message(int code) => switch (code) {
     0 => null,
-    -1403 => 'Sin papel',
-    -1405 => 'Impresora sobrecalentada',
+    -1403 => paperOut,
+    -1405 => overheated,
     -1404 => 'Fallo de impresora',
     -100 => 'Impresora no disponible',
     _ => 'Error de impresión (código $code)',

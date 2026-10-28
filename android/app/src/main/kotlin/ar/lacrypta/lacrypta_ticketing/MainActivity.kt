@@ -198,6 +198,10 @@ class MainActivity : FlutterActivity() {
 
         p.setPrintAppendString("\n\n", normal)
         p.setPrintLine(40)
+        // Streams the slip in chunks and stops at the first failure, so a roll
+        // that runs out mid-slip comes back as PAPEROUT with half a voucher on
+        // the counter. The append buffer is cleared either way: a reprint is a
+        // fresh printVoucher call that lays the whole slip out again.
         return p.setPrintStart()
     }
 

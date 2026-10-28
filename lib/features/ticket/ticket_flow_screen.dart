@@ -20,6 +20,7 @@ import '../../ui/components/lc_spinner.dart';
 import '../../ui/components/lc_surface.dart';
 import '../../ui/components/lc_tabular.dart';
 import '../history/history_controller.dart';
+import 'paper_out_sheet.dart';
 import 'ticket_controller.dart';
 import 'treasure_nfc_panel.dart';
 import 'voucher_preview.dart';
@@ -166,7 +167,8 @@ class TicketFlowScreen extends ConsumerWidget {
       return;
     }
 
-    final error = await PrinterChannel.printVoucher(
+    // Every field is fixed at claim time, so a reprint is the same slip.
+    Future<String?> printSlip() => PrinterChannel.printVoucher(
       image: artwork,
       gift: claimed.label,
       event: event,
@@ -180,12 +182,25 @@ class TicketFlowScreen extends ConsumerWidget {
       giftId: claimed.id,
     );
 
+    var error = await printSlip();
+
+    // The roll ran out, maybe halfway down the slip. Whatever came out is a
+    // stub, so staff load paper and print the whole voucher again.
+    if (error == PrinterChannel.paperOut && context.mounted) {
+      error = await showPaperOutSheet(
+        context,
+        gift: claimed.label,
+        reprint: printSlip,
+      );
+    }
+
     // Nothing came out of a printer. A missing head (emulator, phone) and a
     // hardware fault both leave staff holding the benefit, so the same slip
     // goes on screen. Paper-out and overheat stay as a banner too: those are
     // a real printer that needs attention.
     if (!context.mounted || error == null) return;
-    if (error == 'Sin papel' || error == 'Impresora sobrecalentada') {
+    if (error == PrinterChannel.paperOut ||
+        error == PrinterChannel.overheated) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$error — entregá ${claimed.label} igual'),
